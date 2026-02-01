@@ -1,4 +1,5 @@
-import { Glasses, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
+import logo from "@/assets/oex-logo.png";
 
 const Footer = () => {
   return (
@@ -6,8 +7,7 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <Glasses className="w-6 h-6 text-primary" />
-            <span className="font-serif text-xl font-semibold">FrameFit</span>
+            <img src={logo} alt="OPTIC EXCLUSIVE" className="h-10 w-auto brightness-0 invert" />
           </div>
           
           <p className="text-sm text-background/60 flex items-center gap-1">
