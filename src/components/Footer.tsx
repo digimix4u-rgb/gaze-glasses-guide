@@ -1,29 +1,33 @@
-import { Heart } from "lucide-react";
-import logo from "@/assets/oex-logo.png";
+import logo from "@/assets/oex-logo-white.png";
 
 const Footer = () => {
   return (
-    <footer className="py-12 bg-foreground text-background">
+    <footer className="py-12 bg-[#303030] text-white">
       <div className="container mx-auto px-4">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex flex-col md:flex-row items-start justify-between gap-8">
           <div className="flex items-center gap-2">
-            <img src={logo} alt="OPTIC EXCLUSIVE" className="h-10 w-auto brightness-0 invert" />
+            <img src={logo} alt="OPTIC EXCLUSIVE" className="h-10 w-auto" />
           </div>
           
-          <p className="text-sm text-background/60 flex items-center gap-1">
-            Made with <Heart className="w-4 h-4 text-primary fill-primary" /> for finding your perfect frames
-          </p>
-          
-          <div className="flex items-center gap-6">
-            <a href="#" className="text-sm text-background/60 hover:text-background transition-colors">
-              Privacy
-            </a>
-            <a href="#" className="text-sm text-background/60 hover:text-background transition-colors">
-              Terms
-            </a>
-            <a href="#" className="text-sm text-background/60 hover:text-background transition-colors">
-              Contact
-            </a>
+          <div className="flex flex-col md:flex-row gap-8 md:gap-16">
+            <div>
+              <h4 className="font-semibold text-white mb-3">Postal Address</h4>
+              <address className="text-sm text-white/70 not-italic leading-relaxed">
+                Optic Exclusive<br />
+                Oshakati<br />
+                Box 80067<br />
+                Oshakati
+              </address>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold text-white mb-3">Physical Address</h4>
+              <address className="text-sm text-white/70 not-italic leading-relaxed">
+                Optic Exclusive<br />
+                Game Center<br />
+                Oshakati
+              </address>
+            </div>
           </div>
         </div>
       </div>
