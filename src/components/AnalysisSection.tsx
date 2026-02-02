@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import PhotoUpload from "./PhotoUpload";
 import FaceShapeCard from "./FaceShapeCard";
+import FacialFeatures from "./FacialFeatures";
 import FrameRecommendation from "./FrameRecommendation";
 import VirtualTryOn from "./VirtualTryOn";
 import { faceShapes, getRecommendedFrames, getFaceShapeById, FaceShape, GlassesFrame } from "@/lib/faceShapeData";
-import { FaceLandmarks } from "@/lib/faceAnalysis";
+import { FaceLandmarks, FaceAnalysisResult } from "@/lib/faceAnalysis";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { RefreshCw, Sparkles, AlertCircle, Loader2, Brain, Glasses } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -18,6 +19,7 @@ const AnalysisSection = () => {
   const [secondaryMatches, setSecondaryMatches] = useState<{ shapeId: string; score: number }[]>([]);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [faceLandmarks, setFaceLandmarks] = useState<FaceLandmarks | null>(null);
+  const [faceMeasurements, setFaceMeasurements] = useState<FaceAnalysisResult['measurements'] | null>(null);
   const [showTryOn, setShowTryOn] = useState(false);
   
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -46,6 +48,7 @@ const AnalysisSection = () => {
     setConfidence(0);
     setSecondaryMatches([]);
     setFaceLandmarks(null);
+    setFaceMeasurements(null);
     resetDetection();
   };
 
@@ -71,6 +74,8 @@ const AnalysisSection = () => {
           setSecondaryMatches(result.allScores.slice(1, 3));
           // Store landmarks for virtual try-on
           setFaceLandmarks(result.landmarks);
+          // Store measurements for facial features display
+          setFaceMeasurements(result.measurements);
         }
       }
       
@@ -88,6 +93,7 @@ const AnalysisSection = () => {
     setSecondaryMatches([]);
     setPhotoFile(null);
     setFaceLandmarks(null);
+    setFaceMeasurements(null);
     setShowTryOn(false);
     resetDetection();
   };
@@ -222,26 +228,34 @@ const AnalysisSection = () => {
               )}
 
               <div className="grid lg:grid-cols-2 gap-8">
-                <div>
-                  <h4 className="text-lg font-serif font-semibold text-foreground mb-4">
-                    Your Analysis
-                  </h4>
-                  <FaceShapeCard shape={detectedShape} isSelected />
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-lg font-serif font-semibold text-foreground mb-4">
+                      Your Analysis
+                    </h4>
+                    <FaceShapeCard shape={detectedShape} isSelected />
+                  </div>
                 </div>
 
-                <div>
-                  <h4 className="text-lg font-serif font-semibold text-foreground mb-4">
-                    Key Characteristics
-                  </h4>
-                  <div className="p-6 rounded-2xl bg-background shadow-soft">
-                    <ul className="space-y-3">
-                      {detectedShape.characteristics.map((char, i) => (
-                        <li key={i} className="flex items-start gap-3 text-muted-foreground">
-                          <span className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                          {char}
-                        </li>
-                      ))}
-                    </ul>
+                <div className="space-y-6">
+                  {faceMeasurements && (
+                    <FacialFeatures measurements={faceMeasurements} />
+                  )}
+                  
+                  <div>
+                    <h4 className="text-lg font-serif font-semibold text-foreground mb-4">
+                      Key Characteristics
+                    </h4>
+                    <div className="p-6 rounded-2xl bg-background shadow-soft">
+                      <ul className="space-y-3">
+                        {detectedShape.characteristics.map((char, i) => (
+                          <li key={i} className="flex items-start gap-3 text-muted-foreground">
+                            <span className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
+                            {char}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </div>
