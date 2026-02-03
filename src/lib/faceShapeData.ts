@@ -161,7 +161,7 @@ export const glassesFrames: GlassesFrame[] = [
     name: "Classic Square",
     style: "Square",
     bestFor: ["oval", "round", "oblong"],
-    imageUrl: "https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=400&h=300&fit=crop&q=80",
+    imageUrl: "/frames/classic-square.jpg",
     color: "Tortoise"
   },
   {
@@ -169,7 +169,7 @@ export const glassesFrames: GlassesFrame[] = [
     name: "Windsor Round",
     style: "Round",
     bestFor: ["square", "heart", "diamond"],
-    imageUrl: "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=400&h=300&fit=crop&q=80",
+    imageUrl: "/frames/windsor-round.jpg",
     color: "Gold"
   },
   {
@@ -177,7 +177,7 @@ export const glassesFrames: GlassesFrame[] = [
     name: "Aviator Classic",
     style: "Aviator",
     bestFor: ["oval", "square", "oblong"],
-    imageUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400&h=300&fit=crop&q=80",
+    imageUrl: "/frames/aviator-classic.jpg",
     color: "Silver"
   },
   {
@@ -185,7 +185,7 @@ export const glassesFrames: GlassesFrame[] = [
     name: "Retro Cat Eye",
     style: "Cat Eye",
     bestFor: ["oval", "diamond", "round"],
-    imageUrl: "https://images.unsplash.com/photo-1577803645773-f96470509666?w=400&h=300&fit=crop&q=80",
+    imageUrl: "/frames/cat-eye-retro.jpg",
     color: "Black"
   },
   {
@@ -193,7 +193,7 @@ export const glassesFrames: GlassesFrame[] = [
     name: "Modern Rectangle",
     style: "Rectangle",
     bestFor: ["round", "oval", "oblong"],
-    imageUrl: "https://images.unsplash.com/photo-1591076482161-42ce6da69f67?w=400&h=300&fit=crop&q=80",
+    imageUrl: "/frames/rectangle-modern.jpg",
     color: "Matte Black"
   },
   {
@@ -201,7 +201,7 @@ export const glassesFrames: GlassesFrame[] = [
     name: "Bold Geometric",
     style: "Geometric",
     bestFor: ["oval", "round"],
-    imageUrl: "https://images.unsplash.com/photo-1509695507497-903c140c43b0?w=400&h=300&fit=crop&q=80",
+    imageUrl: "/frames/geometric-bold.jpg",
     color: "Amber"
   },
   {
@@ -209,7 +209,7 @@ export const glassesFrames: GlassesFrame[] = [
     name: "Vintage Browline",
     style: "Browline",
     bestFor: ["round", "oval", "heart"],
-    imageUrl: "https://images.unsplash.com/photo-1473496169904-658ba7c44d8a?w=400&h=300&fit=crop&q=80",
+    imageUrl: "/frames/browline-vintage.jpg",
     color: "Dark Tortoise"
   },
   {
@@ -217,7 +217,7 @@ export const glassesFrames: GlassesFrame[] = [
     name: "Rimless Oval",
     style: "Rimless",
     bestFor: ["square", "diamond", "heart"],
-    imageUrl: "https://images.unsplash.com/photo-1483468922814-84c54ce18225?w=400&h=300&fit=crop&q=80",
+    imageUrl: "/frames/rimless-oval.jpg",
     color: "Clear"
   }
 ];
