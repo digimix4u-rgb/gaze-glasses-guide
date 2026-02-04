@@ -1,3 +1,5 @@
+export type Gender = 'male' | 'female';
+
 export interface FaceShape {
   id: string;
   name: string;

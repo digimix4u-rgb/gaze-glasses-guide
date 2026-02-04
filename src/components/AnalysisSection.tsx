@@ -3,13 +3,16 @@ import { Button } from "@/components/ui/button";
 import PhotoUpload from "./PhotoUpload";
 import FaceShapeCard from "./FaceShapeCard";
 import FacialFeatures from "./FacialFeatures";
-import { faceShapes, getFaceShapeById, FaceShape } from "@/lib/faceShapeData";
+import GenderSelection from "./GenderSelection";
+import { faceShapes, getFaceShapeById, FaceShape, Gender } from "@/lib/faceShapeData";
 import { FaceAnalysisResult } from "@/lib/faceAnalysis";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { RefreshCw, Sparkles, AlertCircle, Loader2, Brain } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 const AnalysisSection = () => {
+  const [gender, setGender] = useState<Gender | null>(null);
   const [detectedShape, setDetectedShape] = useState<FaceShape | null>(null);
   const [hasPhoto, setHasPhoto] = useState(false);
   const [confidence, setConfidence] = useState<number>(0);
@@ -76,6 +79,7 @@ const AnalysisSection = () => {
   };
 
   const resetAnalysis = () => {
+    setGender(null);
     setDetectedShape(null);
     setHasPhoto(false);
     setConfidence(0);
@@ -104,7 +108,9 @@ const AnalysisSection = () => {
         </div>
 
         <div className="max-w-6xl mx-auto">
-          {!detectedShape ? (
+          {!gender ? (
+            <GenderSelection onSelect={setGender} />
+          ) : !detectedShape ? (
             <div className="flex flex-col items-center gap-8">
               <PhotoUpload onPhotoSelect={handlePhotoSelect} isAnalyzing={isProcessing} />
               
@@ -179,6 +185,7 @@ const AnalysisSection = () => {
                   Your Face Shape: {detectedShape.name}
                 </h3>
                 <div className="flex items-center justify-center gap-2 mb-4">
+                  <Badge variant="secondary" className="capitalize">{gender}</Badge>
                   <div className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
                     {confidence}% confidence
                   </div>
