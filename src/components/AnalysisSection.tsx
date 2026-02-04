@@ -3,24 +3,19 @@ import { Button } from "@/components/ui/button";
 import PhotoUpload from "./PhotoUpload";
 import FaceShapeCard from "./FaceShapeCard";
 import FacialFeatures from "./FacialFeatures";
-import FrameRecommendation from "./FrameRecommendation";
-import VirtualTryOn from "./VirtualTryOn";
-import { faceShapes, getRecommendedFrames, getFaceShapeById, FaceShape, GlassesFrame } from "@/lib/faceShapeData";
-import { FaceLandmarks, FaceAnalysisResult } from "@/lib/faceAnalysis";
+import { faceShapes, getFaceShapeById, FaceShape } from "@/lib/faceShapeData";
+import { FaceAnalysisResult } from "@/lib/faceAnalysis";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
-import { RefreshCw, Sparkles, AlertCircle, Loader2, Brain, Glasses } from "lucide-react";
+import { RefreshCw, Sparkles, AlertCircle, Loader2, Brain } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 const AnalysisSection = () => {
   const [detectedShape, setDetectedShape] = useState<FaceShape | null>(null);
-  const [recommendedFrames, setRecommendedFrames] = useState<GlassesFrame[]>([]);
   const [hasPhoto, setHasPhoto] = useState(false);
   const [confidence, setConfidence] = useState<number>(0);
   const [secondaryMatches, setSecondaryMatches] = useState<{ shapeId: string; score: number }[]>([]);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [faceLandmarks, setFaceLandmarks] = useState<FaceLandmarks | null>(null);
   const [faceMeasurements, setFaceMeasurements] = useState<FaceAnalysisResult['measurements'] | null>(null);
-  const [showTryOn, setShowTryOn] = useState(false);
   
   const imageRef = useRef<HTMLImageElement | null>(null);
   
@@ -44,10 +39,8 @@ const AnalysisSection = () => {
     setPhotoFile(file);
     setHasPhoto(true);
     setDetectedShape(null);
-    setRecommendedFrames([]);
     setConfidence(0);
     setSecondaryMatches([]);
-    setFaceLandmarks(null);
     setFaceMeasurements(null);
     resetDetection();
   };
@@ -68,12 +61,9 @@ const AnalysisSection = () => {
         const shape = getFaceShapeById(result.faceShapeId);
         if (shape) {
           setDetectedShape(shape);
-          setRecommendedFrames(getRecommendedFrames(shape.id));
           setConfidence(result.confidence);
           // Get top 2 secondary matches
           setSecondaryMatches(result.allScores.slice(1, 3));
-          // Store landmarks for virtual try-on
-          setFaceLandmarks(result.landmarks);
           // Store measurements for facial features display
           setFaceMeasurements(result.measurements);
         }
@@ -87,14 +77,11 @@ const AnalysisSection = () => {
 
   const resetAnalysis = () => {
     setDetectedShape(null);
-    setRecommendedFrames([]);
     setHasPhoto(false);
     setConfidence(0);
     setSecondaryMatches([]);
     setPhotoFile(null);
-    setFaceLandmarks(null);
     setFaceMeasurements(null);
-    setShowTryOn(false);
     resetDetection();
   };
 
@@ -212,21 +199,6 @@ const AnalysisSection = () => {
                 </p>
               </div>
 
-              {/* Virtual Try-On CTA */}
-              {faceLandmarks && photoFile && recommendedFrames.length > 0 && (
-                <div className="flex justify-center">
-                  <Button 
-                    variant="hero" 
-                    size="lg" 
-                    onClick={() => setShowTryOn(true)}
-                    className="gap-3"
-                  >
-                    <Glasses className="w-5 h-5" />
-                    Try On Glasses Virtually
-                  </Button>
-                </div>
-              )}
-
               <div className="grid lg:grid-cols-2 gap-8">
                 <div className="space-y-6">
                   <div>
@@ -260,24 +232,7 @@ const AnalysisSection = () => {
                 </div>
               </div>
 
-              <div>
-                <h4 className="text-2xl font-serif font-bold text-foreground mb-6 text-center">
-                  Recommended Frames for You
-                </h4>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {recommendedFrames.map((frame) => (
-                    <FrameRecommendation key={frame.id} frame={frame} />
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-center gap-4">
-                {faceLandmarks && photoFile && recommendedFrames.length > 0 && (
-                  <Button variant="outline" size="lg" onClick={() => setShowTryOn(true)}>
-                    <Glasses className="w-5 h-5" />
-                    Virtual Try-On
-                  </Button>
-                )}
+              <div className="flex justify-center">
                 <Button variant="outline" size="lg" onClick={resetAnalysis}>
                   <RefreshCw className="w-5 h-5" />
                   Try Another Photo
@@ -287,16 +242,6 @@ const AnalysisSection = () => {
           )}
         </div>
       </div>
-
-      {/* Virtual Try-On Modal */}
-      {showTryOn && photoFile && faceLandmarks && (
-        <VirtualTryOn
-          photoFile={photoFile}
-          landmarks={faceLandmarks}
-          recommendedFrames={recommendedFrames}
-          onClose={() => setShowTryOn(false)}
-        />
-      )}
     </section>
   );
 };
