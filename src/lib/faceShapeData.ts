@@ -13,12 +13,12 @@ export const faceShapes: FaceShape[] = [
   {
     id: "oval",
     name: "Oval",
-    description: "The oval face is considered the ideal shape for glasses. Your face is longer than it is wide, with a gently rounded jawline.",
+    description: "Considered the most balanced shape, an oval face is slightly longer than it is wide. It has a gently rounded jawline and forehead that's a little broader than the chin.",
     characteristics: [
-      "Face length is about 1.5 times the width",
-      "Forehead is slightly wider than the chin",
-      "Cheekbones are the widest part",
-      "Soft, rounded jawline"
+      "Slightly longer than wide",
+      "Gently rounded jawline",
+      "Forehead is a little broader than chin",
+      "Balanced, versatile proportions"
     ],
     recommendations: [
       "Square frames",
@@ -34,11 +34,11 @@ export const faceShapes: FaceShape[] = [
   {
     id: "round",
     name: "Round",
-    description: "Round faces have soft curves with similar width and length. Angular frames can add definition and structure.",
+    description: "Round faces are soft and full, with equal width and length. The cheeks are typically the widest part, and the jawline has minimal angles, giving a youthful, approachable look.",
     characteristics: [
-      "Face width and length are nearly equal",
-      "Rounded hairline and jawline",
-      "Full cheeks",
+      "Equal width and length",
+      "Cheeks are typically the widest part",
+      "Minimal jaw angles",
       "Soft, curved features"
     ],
     recommendations: [
@@ -57,11 +57,11 @@ export const faceShapes: FaceShape[] = [
   {
     id: "square",
     name: "Square",
-    description: "Square faces feature a strong jawline and broad forehead. Round or oval frames can soften angular features.",
+    description: "Square faces have a strong, defined jawline with a forehead, cheekbones, and jaw that are about the same width. This shape often gives off a bold, confident impression.",
     characteristics: [
-      "Strong, angular jawline",
-      "Broad forehead",
-      "Wide cheekbones",
+      "Strong, defined jawline",
+      "Forehead, cheekbones, and jaw about the same width",
+      "Bold, angular features",
       "Face width and length are similar"
     ],
     recommendations: [
@@ -80,11 +80,11 @@ export const faceShapes: FaceShape[] = [
   {
     id: "heart",
     name: "Heart",
-    description: "Heart-shaped faces are wider at the forehead and narrower at the chin. Bottom-heavy frames balance proportions.",
+    description: "A heart-shaped face has a wider forehead and a narrow, pointed chin. The cheekbones are often prominent, creating a soft yet striking look.",
     characteristics: [
-      "Wide forehead",
-      "High cheekbones",
+      "Wider forehead",
       "Narrow, pointed chin",
+      "Prominent cheekbones",
       "May have widow's peak"
     ],
     recommendations: [
@@ -103,12 +103,12 @@ export const faceShapes: FaceShape[] = [
   {
     id: "oblong",
     name: "Oblong",
-    description: "Oblong faces are longer than they are wide with a straight cheek line. Oversized or decorative frames add width.",
+    description: "This face is longer than it is wide, with a straight cheek line. The forehead, cheeks, and jaw are close in width, but the overall face length gives it an elegant, elongated appearance.",
     characteristics: [
-      "Face is notably longer than wide",
+      "Longer than wide",
       "Straight cheek line",
-      "Similar forehead and jaw width",
-      "May have high forehead"
+      "Forehead, cheeks, and jaw close in width",
+      "Elegant, elongated appearance"
     ],
     recommendations: [
       "Oversized frames",
@@ -126,11 +126,11 @@ export const faceShapes: FaceShape[] = [
   {
     id: "diamond",
     name: "Diamond",
-    description: "Diamond faces have wide cheekbones with a narrow forehead and jawline. Oval frames complement this rare shape.",
+    description: "Diamond faces are characterized by a narrow forehead and chin, with the cheekbones being the widest point. This face shape often appears sharp and sculpted.",
     characteristics: [
-      "Narrow forehead and jawline",
-      "Wide, high cheekbones",
-      "Pointed chin",
+      "Narrow forehead and chin",
+      "Cheekbones are the widest point",
+      "Sharp, sculpted appearance",
       "Angular features"
     ],
     recommendations: [

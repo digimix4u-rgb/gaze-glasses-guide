@@ -164,64 +164,66 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   // Score each face shape based on measurements with weighted factors
   const scores: { shapeId: string; score: number }[] = [];
   
-  // Oval: Length 1.3-1.5x width, balanced proportions, gentle tapering
+  // Oval: "Slightly longer than wide, gently rounded jawline, forehead broader than chin"
   // Key characteristics: Face is longer than wide, forehead slightly wider than jaw
   const ovalScore = calculateWeightedShapeScore([
-    { value: lengthToWidthRatio, target: 1.4, tolerance: 0.15, weight: 2.0 },
-    { value: foreheadToJawRatio, target: 1.1, tolerance: 0.15, weight: 1.5 },
-    { value: cheekboneProminence, target: 1.05, tolerance: 0.1, weight: 1.0 },
-    { value: cheekboneToForeheadRatio, target: 1.0, tolerance: 0.1, weight: 1.0 },
+    { value: lengthToWidthRatio, target: 1.35, tolerance: 0.12, weight: 2.0 },
+    { value: foreheadToJawRatio, target: 1.15, tolerance: 0.12, weight: 1.5 },
+    { value: cheekboneProminence, target: 1.02, tolerance: 0.1, weight: 1.0 },
+    { value: cheekboneToForeheadRatio, target: 0.98, tolerance: 0.1, weight: 1.0 },
   ]);
   scores.push({ shapeId: 'oval', score: ovalScore });
   
-  // Round: Length ≈ width, soft angles, full cheeks, fuller chin
-  // Key characteristics: Face length almost equals width, curved jawline, chin width similar to jaw
+  // Round: "Equal width and length, cheeks typically widest, minimal jaw angles"
+  // Key characteristics: Face length almost equals width, cheekbones are widest, curved jawline
   const roundScore = calculateWeightedShapeScore([
-    { value: lengthToWidthRatio, target: 1.05, tolerance: 0.15, weight: 2.0 },
-    { value: foreheadToJawRatio, target: 1.0, tolerance: 0.12, weight: 1.5 },
-    { value: cheekboneProminence, target: 1.0, tolerance: 0.1, weight: 1.5 },
+    { value: lengthToWidthRatio, target: 1.0, tolerance: 0.12, weight: 2.5 },
+    { value: foreheadToJawRatio, target: 1.0, tolerance: 0.1, weight: 1.5 },
+    { value: cheekboneProminence, target: 1.05, tolerance: 0.1, weight: 2.0 },
     { value: chinToJawRatio, target: 0.85, tolerance: 0.15, weight: 1.5 },
   ]);
   scores.push({ shapeId: 'round', score: roundScore });
   
-  // Square: Length ≈ width, strong angular jaw, similar forehead and jaw width
-  // Key characteristics: Prominent jaw, face width at forehead, cheekbones, and jaw are similar
+  // Square: "Forehead, cheekbones, and jaw about the same width, strong defined jawline"
+  // Key characteristics: All three widths are similar, prominent jaw
   const squareScore = calculateWeightedShapeScore([
-    { value: lengthToWidthRatio, target: 1.05, tolerance: 0.1, weight: 2.0 },
-    { value: foreheadToJawRatio, target: 0.95, tolerance: 0.08, weight: 2.0 },
-    { value: cheekboneProminence, target: 1.0, tolerance: 0.1, weight: 1.0 },
-    { value: jawToForeheadRatio, target: 1.05, tolerance: 0.1, weight: 1.5 },
+    { value: lengthToWidthRatio, target: 1.0, tolerance: 0.1, weight: 2.0 },
+    { value: foreheadToJawRatio, target: 1.0, tolerance: 0.05, weight: 2.5 },
+    { value: cheekboneProminence, target: 1.0, tolerance: 0.08, weight: 2.0 },
+    { value: jawToForeheadRatio, target: 1.0, tolerance: 0.08, weight: 2.0 },
   ]);
   scores.push({ shapeId: 'square', score: squareScore });
   
-  // Heart: Wide forehead, narrow pointed jaw/chin, pointed chin
+  // Heart: "Wider forehead, narrow pointed chin, prominent cheekbones"
   // Key characteristics: Forehead is widest, jaw is noticeably narrower, chin tapers to a point
   const heartScore = calculateWeightedShapeScore([
     { value: lengthToWidthRatio, target: 1.3, tolerance: 0.15, weight: 1.5 },
     { value: foreheadToJawRatio, target: 1.4, tolerance: 0.10, weight: 2.5 },
-    { value: cheekboneToForeheadRatio, target: 0.95, tolerance: 0.1, weight: 1.5 },
+    { value: cheekboneProminence, target: 1.1, tolerance: 0.12, weight: 2.0 },
     { value: jawToForeheadRatio, target: 0.7, tolerance: 0.10, weight: 2.0 },
     { value: chinToJawRatio, target: 0.6, tolerance: 0.15, weight: 2.0 },
   ]);
   scores.push({ shapeId: 'heart', score: heartScore });
   
-  // Oblong/Rectangle: Face significantly longer than wide, straight sides
-  // Key characteristics: Length is 1.5x+ width, forehead/cheekbones/jaw are similar
+  // Oblong: "Longer than wide, straight cheek line, forehead/cheeks/jaw close in width"
+  // Key characteristics: Length is notably longer than width, proportions are straight/similar
   const oblongScore = calculateWeightedShapeScore([
-    { value: lengthToWidthRatio, target: 1.6, tolerance: 0.15, weight: 3.0 },
-    { value: foreheadToJawRatio, target: 1.0, tolerance: 0.1, weight: 1.5 },
-    { value: cheekboneProminence, target: 0.98, tolerance: 0.1, weight: 1.0 },
-    { value: cheekboneToForeheadRatio, target: 1.0, tolerance: 0.1, weight: 1.0 },
+    { value: lengthToWidthRatio, target: 1.5, tolerance: 0.12, weight: 3.0 },
+    { value: foreheadToJawRatio, target: 1.0, tolerance: 0.08, weight: 2.0 },
+    { value: cheekboneProminence, target: 1.0, tolerance: 0.08, weight: 1.5 },
+    { value: cheekboneToForeheadRatio, target: 1.0, tolerance: 0.08, weight: 1.5 },
   ]);
   scores.push({ shapeId: 'oblong', score: oblongScore });
   
-  // Diamond: Prominent cheekbones, narrow forehead AND jaw
+  // Diamond: "Narrow forehead AND chin, cheekbones widest"
   // Key characteristics: Cheekbones are the widest point, both forehead and jaw are narrower
+  const foreheadToFaceWidth = foreheadWidth / cheekboneWidth;
+  const jawToFaceWidth = jawWidth / cheekboneWidth;
   const diamondScore = calculateWeightedShapeScore([
     { value: lengthToWidthRatio, target: 1.35, tolerance: 0.15, weight: 1.5 },
-    { value: cheekboneProminence, target: 1.2, tolerance: 0.1, weight: 3.0 },
-    { value: cheekboneToForeheadRatio, target: 1.15, tolerance: 0.12, weight: 2.0 },
-    { value: cheekboneToJawRatio, target: 1.2, tolerance: 0.12, weight: 2.0 },
+    { value: cheekboneProminence, target: 1.15, tolerance: 0.1, weight: 3.0 },
+    { value: foreheadToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 },
+    { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 },
   ]);
   scores.push({ shapeId: 'diamond', score: diamondScore });
   
