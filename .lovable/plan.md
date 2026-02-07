@@ -1,105 +1,89 @@
 
 
-# Improve Face Shape Classification Accuracy
+# Align Face Shape Detection with Reference Definitions
 
-## Problem Analysis
+## Overview
+Update the face shape classification algorithm to more precisely match the official face shape definitions you provided. This will improve accuracy by aligning the detection parameters with the documented characteristics.
 
-The face shape analysis incorrectly classifies a round/oval face as "Heart" shape. Looking at the photo:
-- The face has a **balanced width-to-length ratio** (characteristic of Round)
-- **Full cheeks** with a **rounded jawline** (not pointed chin like Heart)
-- **Forehead and jaw widths are similar** (Heart would have a much wider forehead than jaw)
+## Key Changes Based on Reference Definitions
 
-The current algorithm issues:
-1. **Heart shape tolerance is too loose** - accepts too wide a range of forehead-to-jaw ratios
-2. **Round shape tolerance is too strict** - requires almost perfect 1:1 length-to-width ratio
-3. **Missing jawline curvature analysis** - doesn't distinguish curved (round) vs pointed (heart) chins
-4. **Cheekbone-to-jaw ratio not weighted properly** for Round vs Heart differentiation
+### 1. Oval Face
+**Reference**: "Slightly longer than wide, gently rounded jawline, forehead broader than chin"
+- Adjust length-to-width ratio target to 1.35 (slightly longer)
+- Emphasize forehead-to-chin relationship more
 
-## Solution
+### 2. Round Face  
+**Reference**: "Equal width and length, cheeks typically widest, minimal jaw angles"
+- Add check for cheekbones being the widest point
+- Ensure length-to-width stays close to 1.0
 
-Tune the face shape classification parameters and add better differentiation logic:
+### 3. Square Face
+**Reference**: "Forehead, cheekbones, and jaw about the same width, strong defined jawline"
+- Add stricter check that all three widths are similar
+- This differentiates from Round (which has cheeks widest)
 
-### Changes to `src/lib/faceAnalysis.ts`
+### 4. Heart Face (Most Important Fix)
+**Reference**: "Wider forehead, narrow pointed chin, prominent cheekbones"
+- Keep strict forehead-to-jaw ratio requirement
+- Emphasize that cheekbones are "prominent" (often second widest after forehead)
+- Pointed chin is critical - maintain strict chinToJawRatio check
 
-**1. Adjust Round Shape Parameters (make less strict)**
-- Increase `lengthToWidthRatio` tolerance from 0.08 to 0.12
-- This allows faces that are slightly longer than wide to still be classified as Round
+### 5. Diamond Face
+**Reference**: "Narrow forehead AND chin, cheekbones widest"
+- Add explicit check that BOTH forehead and jaw are narrower than cheekbones
+- Current algorithm checks this but could weight it higher
 
-**2. Adjust Heart Shape Parameters (make more strict)**
-- Increase the target `foreheadToJawRatio` from 1.3 to 1.4 (requires bigger difference)
-- Reduce tolerance from 0.15 to 0.12 (tighter match required)
-- Require lower `jawToForeheadRatio` target of 0.7 (jaw must be notably narrower)
+### 6. Oblong Face
+**Reference**: "Longer than wide, straight cheek line, similar forehead and jaw width"
+- Increase length-to-width target slightly
+- Add check for straight proportions (forehead roughly equals jaw)
 
-**3. Add Chin Pointedness Factor**
-- Calculate the ratio between chin width and jaw width
-- Heart shapes have a more pointed chin relative to jaw width
-- Round shapes have a wider chin relative to jaw width
+## Algorithm Improvements
 
-**4. Improve Oval vs Round Differentiation**
-- Oval should require clearer length-to-width difference (1.3+)
-- Round should capture faces where length roughly equals width
+### Update `src/lib/faceAnalysis.ts`
 
-### Updated Classification Parameters
+Refine the scoring parameters:
 
-| Face Shape | Key Parameter Changes |
-|------------|----------------------|
-| Round | lengthToWidthRatio tolerance: 0.08 -> 0.15, add penalty if foreheadToJawRatio > 1.2 |
-| Heart | foreheadToJawRatio target: 1.3 -> 1.4, tolerance: 0.15 -> 0.10, add chin pointedness check |
-| Oval | Keep existing, but add slight penalty if face is very round |
-| Square | Add jawline angular check |
-| Diamond | Keep existing (cheekbone prominence is the key) |
-| Oblong | Keep existing (length-to-width > 1.5 is clear) |
+| Shape | Parameter | Current | New | Reason |
+|-------|-----------|---------|-----|--------|
+| Oval | lengthToWidthRatio target | 1.4 | 1.35 | "Slightly longer" per reference |
+| Round | Add cheekboneProminence check | 1.0 | 1.05 | "Cheeks typically widest" |
+| Square | foreheadToJawRatio tolerance | 0.08 | 0.05 | "Same width" requires stricter match |
+| Heart | cheekboneProminence weight | 1.5 | 2.0 | "Prominent cheekbones" per reference |
+| Diamond | foreheadToFaceWidth ratio | (missing) | add | "Narrow forehead" is key characteristic |
+| Oblong | lengthToWidthRatio target | 1.6 | 1.5 | Better distinguish from very long faces |
 
-### New Measurement: Chin Width
+### Also Update `src/lib/faceShapeData.ts`
 
-Add calculation of chin width using existing landmarks (`chinLeft`, `chinRight`) to help differentiate:
-- **Heart**: Narrow chin relative to jaw
-- **Round**: Chin width similar to jaw width
+Update the descriptions and characteristics to match your reference definitions exactly:
 
-### Technical Implementation
+**Oval**:
+- Description: "Considered the most balanced shape, an oval face is slightly longer than it is wide. It has a gently rounded jawline and forehead that's a little broader than the chin."
 
-```typescript
-// Add chin measurement
-const chinWidth = calculateDistance(
-  getPoint(LANDMARKS.chinLeft),
-  getPoint(LANDMARKS.chinRight)
-);
-const chinToJawRatio = chinWidth / jawWidth;
+**Round**:
+- Description: "Round faces are soft and full, with equal width and length. The cheeks are typically the widest part, and the jawline has minimal angles, giving a youthful, approachable look."
 
-// Updated measurements object
-const measurements = {
-  ...existingMeasurements,
-  chinWidth,
-  chinToJawRatio,
-};
+**Square**:
+- Description: "Square faces have a strong, defined jawline with a forehead, cheekbones, and jaw that are about the same width. This shape often gives off a bold, confident impression."
 
-// Heart shape - require more extreme tapering
-const heartScore = calculateWeightedShapeScore([
-  { value: lengthToWidthRatio, target: 1.3, tolerance: 0.15, weight: 1.5 },
-  { value: foreheadToJawRatio, target: 1.4, tolerance: 0.10, weight: 2.5 },  // Stricter
-  { value: chinToJawRatio, target: 0.6, tolerance: 0.15, weight: 2.0 },      // NEW: pointed chin
-  { value: jawToForeheadRatio, target: 0.7, tolerance: 0.10, weight: 2.0 },  // Stricter
-]);
+**Heart**:
+- Description: "A heart-shaped face has a wider forehead and a narrow, pointed chin. The cheekbones are often prominent, creating a soft yet striking look."
 
-// Round shape - more forgiving on length ratio
-const roundScore = calculateWeightedShapeScore([
-  { value: lengthToWidthRatio, target: 1.05, tolerance: 0.15, weight: 2.0 }, // More tolerant
-  { value: foreheadToJawRatio, target: 1.0, tolerance: 0.12, weight: 1.5 },
-  { value: cheekboneProminence, target: 1.0, tolerance: 0.1, weight: 1.5 },
-  { value: chinToJawRatio, target: 0.85, tolerance: 0.15, weight: 1.5 },     // NEW: fuller chin
-]);
-```
+**Diamond**:
+- Description: "Diamond faces are characterized by a narrow forehead and chin, with the cheekbones being the widest point. This face shape often appears sharp and sculpted."
+
+**Oblong**:
+- Description: "This face is longer than it is wide, with a straight cheek line. The forehead, cheeks, and jaw are close in width, but the overall face length gives it an elegant, elongated appearance."
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/lib/faceAnalysis.ts` | Add chinWidth/chinToJawRatio measurements, update scoring parameters |
+| `src/lib/faceAnalysis.ts` | Refine classification parameters to match reference definitions |
+| `src/lib/faceShapeData.ts` | Update descriptions to match your exact reference text |
 
 ## Expected Outcome
-
-After these changes:
-- Faces with **balanced proportions and rounded jawlines** will correctly classify as **Round**
-- **Heart** classification will require a more dramatic forehead-to-chin taper and pointed chin
-- Overall accuracy improves for distinguishing between similar face shapes
+- Face shape detection will align with the official definitions you provided
+- More accurate differentiation between similar shapes (Round vs Oval, Heart vs Diamond)
+- User-facing descriptions match industry-standard definitions
 
