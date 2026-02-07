@@ -29,8 +29,24 @@ export function useFaceDetection() {
   
   const modelReadyRef = useRef(isModelReady());
 
-  const loadModel = useCallback(async () => {
-    if (modelReadyRef.current || state.isModelLoading) return;
+  const loadModel = useCallback(async (): Promise<boolean> => {
+    if (modelReadyRef.current) return true;
+    if (state.isModelLoading) {
+      // Wait for existing load to complete
+      return new Promise((resolve) => {
+        const checkReady = setInterval(() => {
+          if (modelReadyRef.current) {
+            clearInterval(checkReady);
+            resolve(true);
+          }
+        }, 100);
+        // Timeout after 30 seconds
+        setTimeout(() => {
+          clearInterval(checkReady);
+          resolve(modelReadyRef.current);
+        }, 30000);
+      });
+    }
     
     setState(prev => ({ 
       ...prev, 
@@ -49,7 +65,9 @@ export function useFaceDetection() {
         }));
       });
       modelReadyRef.current = true;
+      return true;
     } catch (error) {
+      console.error('Failed to load face detection model:', error);
       setState(prev => ({ 
         ...prev, 
         error: { 
@@ -57,6 +75,7 @@ export function useFaceDetection() {
           message: 'Failed to load AI model. Please refresh and try again.' 
         }
       }));
+      return false;
     } finally {
       setState(prev => ({ ...prev, isModelLoading: false }));
     }
@@ -68,9 +87,20 @@ export function useFaceDetection() {
     setState(prev => ({ ...prev, isAnalyzing: true, error: null, result: null }));
     
     try {
-      // Ensure model is loaded
+      // Ensure model is loaded and wait for it
       if (!modelReadyRef.current) {
-        await loadModel();
+        const modelLoaded = await loadModel();
+        if (!modelLoaded) {
+          setState(prev => ({ 
+            ...prev, 
+            error: { 
+              type: 'model-error', 
+              message: 'Face detection model not initialized. Please refresh and try again.' 
+            },
+            isAnalyzing: false 
+          }));
+          return null;
+        }
       }
       
       const result = await analyzeFace(imageElement);
