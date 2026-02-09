@@ -1,54 +1,44 @@
-import * as tf from '@tensorflow/tfjs';
-import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection';
+import * as faceapi from 'face-api.js';
 
-// Landmark indices for key facial points (MediaPipe Face Mesh - 468 points)
+// Face-api.js landmark indices for 68-point model
 export const LANDMARKS = {
-  // Forehead points
-  foreheadLeft: 54,
-  foreheadRight: 284,
-  foreheadTop: 10,
+  // Jaw outline (0-16)
+  jawLeft: 0,
+  jawRight: 16,
+  chin: 8,
   
-  // Temple points (widest forehead)
-  templeLeft: 127,
-  templeRight: 356,
+  // Left eyebrow (17-21)
+  leftBrowOuter: 17,
+  leftBrowInner: 21,
   
-  // Cheekbone points (widest face)
-  cheekboneLeft: 234,
-  cheekboneRight: 454,
+  // Right eyebrow (22-26)
+  rightBrowOuter: 26,
+  rightBrowInner: 22,
   
-  // Jaw points
-  jawLeft: 172,
-  jawRight: 397,
-  jawBottom: 152,
+  // Nose (27-35)
+  noseBridge: 27,
+  noseBottom: 30,
+  noseLeft: 31,
+  noseRight: 35,
   
-  // Chin
-  chinTip: 152,
-  chinLeft: 32,
-  chinRight: 262,
+  // Left eye (36-41)
+  leftEyeOuter: 36,
+  leftEyeInner: 39,
+  leftEyeTop: 37,
+  leftEyeBottom: 41,
   
-  // Face outline for length
-  faceTop: 10,
-  faceBottom: 152,
+  // Right eye (42-47)
+  rightEyeOuter: 45,
+  rightEyeInner: 42,
+  rightEyeTop: 43,
+  rightEyeBottom: 47,
   
-  // Eye landmarks for glasses positioning
-  leftEyeOuter: 33,
-  leftEyeInner: 133,
-  leftEyeTop: 159,
-  leftEyeBottom: 145,
-  rightEyeOuter: 263,
-  rightEyeInner: 362,
-  rightEyeTop: 386,
-  rightEyeBottom: 374,
-  
-  // Nose bridge
-  noseBridgeTop: 6,
-  noseBridgeMid: 4,
-  noseBottom: 1,
+  // Outer lip (48-59)
+  // Inner lip (60-67)
 };
 
 export interface FaceLandmarks {
-  keypoints: { x: number; y: number; z?: number }[];
-  // Computed positions for glasses overlay
+  keypoints: { x: number; y: number }[];
   eyeCenter: { x: number; y: number };
   eyeWidth: number;
   faceWidth: number;
@@ -82,14 +72,16 @@ export interface FaceDetectionError {
   message: string;
 }
 
-let detector: faceLandmarksDetection.FaceLandmarksDetector | null = null;
+let modelsLoaded = false;
 let isModelLoading = false;
 let modelLoadPromise: Promise<void> | null = null;
+
+const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
 
 export async function initializeFaceDetector(
   onProgress?: (progress: number, message: string) => void
 ): Promise<void> {
-  if (detector) return;
+  if (modelsLoaded) return;
   
   if (isModelLoading && modelLoadPromise) {
     await modelLoadPromise;
@@ -100,25 +92,19 @@ export async function initializeFaceDetector(
   
   modelLoadPromise = (async () => {
     try {
-      onProgress?.(10, 'Setting up TensorFlow.js...');
+      onProgress?.(10, 'Loading face detection model...');
       
-      // Set backend
-      await tf.ready();
-      onProgress?.(30, 'Loading AI model...');
+      // Load TinyFaceDetector for fast face detection
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      onProgress?.(50, 'Loading landmark detection...');
       
-      // Create detector with MediaPipe Face Mesh
-      detector = await faceLandmarksDetection.createDetector(
-        faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
-        {
-          runtime: 'tfjs',
-          refineLandmarks: true,
-          maxFaces: 1,
-        }
-      );
+      // Load 68-point landmark model
+      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+      onProgress?.(100, 'Models ready!');
       
-      onProgress?.(100, 'AI model ready!');
+      modelsLoaded = true;
     } catch (error) {
-      console.error('Failed to load face detection model:', error);
+      console.error('Failed to load face-api.js models:', error);
       throw error;
     } finally {
       isModelLoading = false;
@@ -129,7 +115,7 @@ export async function initializeFaceDetector(
 }
 
 export function isModelReady(): boolean {
-  return detector !== null;
+  return modelsLoaded;
 }
 
 function calculateDistance(
@@ -139,6 +125,27 @@ function calculateDistance(
   return Math.sqrt(
     Math.pow(point2.x - point1.x, 2) + Math.pow(point2.y - point1.y, 2)
   );
+}
+
+interface ShapeParameter {
+  value: number;
+  target: number;
+  tolerance: number;
+  weight: number;
+}
+
+function calculateWeightedShapeScore(params: ShapeParameter[]): number {
+  let totalScore = 0;
+  let totalWeight = 0;
+  
+  for (const param of params) {
+    const deviation = Math.abs(param.value - param.target) / param.tolerance;
+    const score = Math.exp(-Math.pow(deviation, 2));
+    totalScore += score * param.weight;
+    totalWeight += param.weight;
+  }
+  
+  return totalScore / totalWeight;
 }
 
 function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
@@ -156,16 +163,14 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
     chinToJawRatio,
   } = measurements;
   
-  // Additional derived ratios for better differentiation
   const jawToForeheadRatio = jawWidth / foreheadWidth;
   const cheekboneToForeheadRatio = cheekboneWidth / foreheadWidth;
-  const cheekboneToJawRatio = cheekboneWidth / jawWidth;
+  const foreheadToFaceWidth = foreheadWidth / cheekboneWidth;
+  const jawToFaceWidth = jawWidth / cheekboneWidth;
   
-  // Score each face shape based on measurements with weighted factors
   const scores: { shapeId: string; score: number }[] = [];
   
   // Oval: "Slightly longer than wide, gently rounded jawline, forehead broader than chin"
-  // Key characteristics: Face is longer than wide, forehead slightly wider than jaw
   const ovalScore = calculateWeightedShapeScore([
     { value: lengthToWidthRatio, target: 1.35, tolerance: 0.12, weight: 2.0 },
     { value: foreheadToJawRatio, target: 1.15, tolerance: 0.12, weight: 1.5 },
@@ -175,7 +180,6 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   scores.push({ shapeId: 'oval', score: ovalScore });
   
   // Round: "Equal width and length, cheeks typically widest, minimal jaw angles"
-  // Key characteristics: Face length almost equals width, cheekbones are widest, curved jawline
   const roundScore = calculateWeightedShapeScore([
     { value: lengthToWidthRatio, target: 1.0, tolerance: 0.12, weight: 2.5 },
     { value: foreheadToJawRatio, target: 1.0, tolerance: 0.1, weight: 1.5 },
@@ -185,7 +189,6 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   scores.push({ shapeId: 'round', score: roundScore });
   
   // Square: "Forehead, cheekbones, and jaw about the same width, strong defined jawline"
-  // Key characteristics: All three widths are similar, prominent jaw
   const squareScore = calculateWeightedShapeScore([
     { value: lengthToWidthRatio, target: 1.0, tolerance: 0.1, weight: 2.0 },
     { value: foreheadToJawRatio, target: 1.0, tolerance: 0.05, weight: 2.5 },
@@ -195,7 +198,6 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   scores.push({ shapeId: 'square', score: squareScore });
   
   // Heart: "Wider forehead, narrow pointed chin, prominent cheekbones"
-  // Key characteristics: Forehead is widest, jaw is noticeably narrower, chin tapers to a point
   const heartScore = calculateWeightedShapeScore([
     { value: lengthToWidthRatio, target: 1.3, tolerance: 0.15, weight: 1.5 },
     { value: foreheadToJawRatio, target: 1.4, tolerance: 0.10, weight: 2.5 },
@@ -206,7 +208,6 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   scores.push({ shapeId: 'heart', score: heartScore });
   
   // Oblong: "Longer than wide, straight cheek line, forehead/cheeks/jaw close in width"
-  // Key characteristics: Length is notably longer than width, proportions are straight/similar
   const oblongScore = calculateWeightedShapeScore([
     { value: lengthToWidthRatio, target: 1.5, tolerance: 0.12, weight: 3.0 },
     { value: foreheadToJawRatio, target: 1.0, tolerance: 0.08, weight: 2.0 },
@@ -216,9 +217,6 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   scores.push({ shapeId: 'oblong', score: oblongScore });
   
   // Diamond: "Narrow forehead AND chin, cheekbones widest"
-  // Key characteristics: Cheekbones are the widest point, both forehead and jaw are narrower
-  const foreheadToFaceWidth = foreheadWidth / cheekboneWidth;
-  const jawToFaceWidth = jawWidth / cheekboneWidth;
   const diamondScore = calculateWeightedShapeScore([
     { value: lengthToWidthRatio, target: 1.35, tolerance: 0.15, weight: 1.5 },
     { value: cheekboneProminence, target: 1.15, tolerance: 0.1, weight: 3.0 },
@@ -227,22 +225,18 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   ]);
   scores.push({ shapeId: 'diamond', score: diamondScore });
   
-  // Sort by score descending
   scores.sort((a, b) => b.score - a.score);
   
-  // Normalize scores to percentages with enhanced confidence calculation
   const totalScore = scores.reduce((sum, s) => sum + s.score, 0);
   const normalizedScores = scores.map(s => ({
     shapeId: s.shapeId,
     score: Math.round((s.score / totalScore) * 100)
   }));
   
-  // Calculate confidence based on how much the top score exceeds the second
   const topScore = normalizedScores[0].score;
   const secondScore = normalizedScores[1]?.score || 0;
   const scoreDifference = topScore - secondScore;
   
-  // Boost confidence if there's clear differentiation
   const confidenceBoost = Math.min(scoreDifference * 0.5, 10);
   const adjustedConfidence = Math.min(topScore + confidenceBoost, 95);
   
@@ -253,32 +247,12 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   };
 }
 
-interface ShapeParameter {
-  value: number;
-  target: number;
-  tolerance: number;
-  weight: number;
-}
-
-function calculateWeightedShapeScore(params: ShapeParameter[]): number {
-  let totalScore = 0;
-  let totalWeight = 0;
+function extractFaceLandmarks(landmarks: faceapi.FaceLandmarks68): FaceLandmarks {
+  const positions = landmarks.positions;
   
-  for (const param of params) {
-    // Gaussian scoring with weighted importance
-    const deviation = Math.abs(param.value - param.target) / param.tolerance;
-    const score = Math.exp(-Math.pow(deviation, 2));
-    totalScore += score * param.weight;
-    totalWeight += param.weight;
-  }
-  
-  return totalScore / totalWeight;
-}
-
-function extractFaceLandmarks(keypoints: { x: number; y: number; z?: number }[]): FaceLandmarks {
   const getPoint = (index: number) => ({
-    x: keypoints[index].x,
-    y: keypoints[index].y
+    x: positions[index].x,
+    y: positions[index].y
   });
   
   // Get eye landmarks
@@ -292,9 +266,8 @@ function extractFaceLandmarks(keypoints: { x: number; y: number; z?: number }[])
   const rightEyeTop = getPoint(LANDMARKS.rightEyeTop);
   const rightEyeBottom = getPoint(LANDMARKS.rightEyeBottom);
   
-  const noseBridge = getPoint(LANDMARKS.noseBridgeTop);
+  const noseBridge = getPoint(LANDMARKS.noseBridge);
   
-  // Calculate eye dimensions
   const leftEyeWidth = calculateDistance(leftEyeOuter, leftEyeInner);
   const leftEyeHeight = calculateDistance(leftEyeTop, leftEyeBottom);
   const leftEyeCenter = {
@@ -309,28 +282,25 @@ function extractFaceLandmarks(keypoints: { x: number; y: number; z?: number }[])
     y: (rightEyeTop.y + rightEyeBottom.y) / 2
   };
   
-  // Calculate overall eye center (for glasses positioning)
   const eyeCenter = {
     x: (leftEyeCenter.x + rightEyeCenter.x) / 2,
     y: (leftEyeCenter.y + rightEyeCenter.y) / 2
   };
   
-  // Distance between outer eye corners (for glasses width)
   const eyeWidth = calculateDistance(leftEyeOuter, rightEyeOuter);
   
-  // Face width at temples
-  const templeLeft = getPoint(LANDMARKS.templeLeft);
-  const templeRight = getPoint(LANDMARKS.templeRight);
-  const faceWidth = calculateDistance(templeLeft, templeRight);
+  // Face width at jaw
+  const jawLeft = getPoint(LANDMARKS.jawLeft);
+  const jawRight = getPoint(LANDMARKS.jawRight);
+  const faceWidth = calculateDistance(jawLeft, jawRight);
   
-  // Calculate face angle (rotation)
   const faceAngle = Math.atan2(
     rightEyeCenter.y - leftEyeCenter.y,
     rightEyeCenter.x - leftEyeCenter.x
   );
   
   return {
-    keypoints,
+    keypoints: positions.map(p => ({ x: p.x, y: p.y })),
     eyeCenter,
     eyeWidth,
     faceWidth,
@@ -354,58 +324,67 @@ function extractFaceLandmarks(keypoints: { x: number; y: number; z?: number }[])
 export async function analyzeFace(
   imageElement: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement
 ): Promise<FaceAnalysisResult> {
-  if (!detector) {
+  if (!modelsLoaded) {
     throw { type: 'model-error', message: 'Face detection model not initialized' } as FaceDetectionError;
   }
   
-  // Detect faces
-  const faces = await detector.estimateFaces(imageElement, {
-    flipHorizontal: false,
-  });
+  // Detect face with landmarks using face-api.js
+  const detection = await faceapi
+    .detectSingleFace(imageElement, new faceapi.TinyFaceDetectorOptions())
+    .withFaceLandmarks();
   
-  if (faces.length === 0) {
+  if (!detection) {
     throw { 
       type: 'no-face', 
       message: 'No face detected. Please ensure your face is clearly visible and well-lit.' 
     } as FaceDetectionError;
   }
   
-  if (faces.length > 1) {
-    throw { 
-      type: 'multiple-faces', 
-      message: 'Multiple faces detected. Please use a photo with only one person.' 
-    } as FaceDetectionError;
-  }
+  const landmarks68 = detection.landmarks;
+  const positions = landmarks68.positions;
   
-  const face = faces[0];
-  const keypoints = face.keypoints;
-  
-  // Extract key landmark positions
   const getPoint = (index: number) => ({
-    x: keypoints[index].x,
-    y: keypoints[index].y
+    x: positions[index].x,
+    y: positions[index].y
   });
   
-  // Calculate measurements
-  const templeLeft = getPoint(LANDMARKS.templeLeft);
-  const templeRight = getPoint(LANDMARKS.templeRight);
-  const cheekboneLeft = getPoint(LANDMARKS.cheekboneLeft);
-  const cheekboneRight = getPoint(LANDMARKS.cheekboneRight);
-  const jawLeft = getPoint(LANDMARKS.jawLeft);
-  const jawRight = getPoint(LANDMARKS.jawRight);
-  const faceTop = getPoint(LANDMARKS.faceTop);
-  const faceBottom = getPoint(LANDMARKS.faceBottom);
+  // Calculate key measurements using 68-point landmarks
+  // Forehead width: distance between outer eyebrow points
+  const foreheadLeft = getPoint(17);  // Left eyebrow outer
+  const foreheadRight = getPoint(26); // Right eyebrow outer
+  const foreheadWidth = calculateDistance(foreheadLeft, foreheadRight);
   
-  const foreheadWidth = calculateDistance(templeLeft, templeRight);
+  // Cheekbone width: points 1 and 15 on jaw outline (upper jaw)
+  const cheekboneLeft = getPoint(1);
+  const cheekboneRight = getPoint(15);
   const cheekboneWidth = calculateDistance(cheekboneLeft, cheekboneRight);
-  const jawWidth = calculateDistance(jawLeft, jawRight);
-  const faceLength = calculateDistance(faceTop, faceBottom);
-  const faceWidth = Math.max(foreheadWidth, cheekboneWidth, jawWidth);
   
-  // Calculate chin width for better Heart vs Round differentiation
-  const chinLeft = getPoint(LANDMARKS.chinLeft);
-  const chinRight = getPoint(LANDMARKS.chinRight);
+  // Jaw width: points 4 and 12 on jaw outline
+  const jawLeft = getPoint(4);
+  const jawRight = getPoint(12);
+  const jawWidth = calculateDistance(jawLeft, jawRight);
+  
+  // Chin width: points 6 and 10 on jaw outline
+  const chinLeft = getPoint(6);
+  const chinRight = getPoint(10);
   const chinWidth = calculateDistance(chinLeft, chinRight);
+  
+  // Face length: from forehead (using nose bridge top estimate) to chin
+  const noseBridgeTop = getPoint(27);
+  const chin = getPoint(8);
+  // Estimate forehead top as mirror of nose bridge above brow line
+  const browCenter = {
+    x: (getPoint(19).x + getPoint(24).x) / 2,
+    y: (getPoint(19).y + getPoint(24).y) / 2
+  };
+  const browToNose = noseBridgeTop.y - browCenter.y;
+  const estimatedForeheadTop = {
+    x: browCenter.x,
+    y: browCenter.y - browToNose * 1.5
+  };
+  const faceLength = calculateDistance(estimatedForeheadTop, chin);
+  
+  const faceWidth = Math.max(foreheadWidth, cheekboneWidth, jawWidth);
   const chinToJawRatio = chinWidth / jawWidth;
   
   const measurements = {
@@ -421,10 +400,7 @@ export async function analyzeFace(
     chinToJawRatio
   };
   
-  // Extract landmarks for glasses overlay
-  const landmarks = extractFaceLandmarks(keypoints);
-  
-  // Classify face shape
+  const faceLandmarks = extractFaceLandmarks(landmarks68);
   const classification = classifyFaceShape(measurements);
   
   return {
@@ -432,31 +408,29 @@ export async function analyzeFace(
     confidence: classification.confidence,
     allScores: classification.allScores,
     measurements,
-    landmarks
+    landmarks: faceLandmarks
   };
 }
 
 export async function detectFaceLandmarks(
   imageElement: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement
 ): Promise<FaceLandmarks | null> {
-  if (!detector) {
+  if (!modelsLoaded) {
     return null;
   }
   
-  const faces = await detector.estimateFaces(imageElement, {
-    flipHorizontal: false,
-  });
+  const detection = await faceapi
+    .detectSingleFace(imageElement, new faceapi.TinyFaceDetectorOptions())
+    .withFaceLandmarks();
   
-  if (faces.length === 0) {
+  if (!detection) {
     return null;
   }
   
-  return extractFaceLandmarks(faces[0].keypoints);
+  return extractFaceLandmarks(detection.landmarks);
 }
 
 export function disposeModel(): void {
-  if (detector) {
-    detector.dispose();
-    detector = null;
-  }
+  // face-api.js doesn't require explicit disposal
+  modelsLoaded = false;
 }
