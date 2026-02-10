@@ -1,89 +1,66 @@
 
 
-# Align Face Shape Detection with Reference Definitions
+# Add Progressive Web App (PWA) Capabilities
 
 ## Overview
-Update the face shape classification algorithm to more precisely match the official face shape definitions you provided. This will improve accuracy by aligning the detection parameters with the documented characteristics.
+Add PWA features to the existing face shape detection app, enabling offline use, home screen installation, and cached model files -- all while keeping existing functionality unchanged.
 
-## Key Changes Based on Reference Definitions
+## Changes
 
-### 1. Oval Face
-**Reference**: "Slightly longer than wide, gently rounded jawline, forehead broader than chin"
-- Adjust length-to-width ratio target to 1.35 (slightly longer)
-- Emphasize forehead-to-chin relationship more
+### 1. Install `vite-plugin-pwa`
+Add the `vite-plugin-pwa` package, which handles manifest generation, service worker creation, and precaching automatically via Workbox.
 
-### 2. Round Face  
-**Reference**: "Equal width and length, cheeks typically widest, minimal jaw angles"
-- Add check for cheekbones being the widest point
-- Ensure length-to-width stays close to 1.0
+### 2. Update `vite.config.ts`
+Configure the PWA plugin with:
+- **Manifest**: name "Frame Finder", short_name "FrameFinder", theme_color "#E31E24", background_color "#fafafa", display "standalone", orientation "portrait", start_url "/"
+- **Icons**: Reference 192x192 and 512x512 icons (using the existing logo)
+- **Service Worker (Workbox)**: 
+  - Precache the app shell (HTML, CSS, JS)
+  - Runtime caching rule for `cdn.jsdelivr.net` (face-api.js models) using **CacheFirst** strategy
+  - Runtime caching for Google Fonts using **StaleWhileRevalidate**
+- **Register type**: autoUpdate (seamless updates)
 
-### 3. Square Face
-**Reference**: "Forehead, cheekbones, and jaw about the same width, strong defined jawline"
-- Add stricter check that all three widths are similar
-- This differentiates from Round (which has cheeks widest)
+### 3. Update `index.html`
+- Add `<meta name="theme-color" content="#E31E24">`
+- Add `<link rel="apple-touch-icon" href="/pwa-192x192.png">`
+- Add `<meta name="apple-mobile-web-app-capable" content="yes">`
+- Add `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`
+- The manifest link is auto-injected by the plugin
 
-### 4. Heart Face (Most Important Fix)
-**Reference**: "Wider forehead, narrow pointed chin, prominent cheekbones"
-- Keep strict forehead-to-jaw ratio requirement
-- Emphasize that cheekbones are "prominent" (often second widest after forehead)
-- Pointed chin is critical - maintain strict chinToJawRatio check
+### 4. Create PWA Icons
+Generate simple icon files at `public/pwa-192x192.png` and `public/pwa-512x512.png` using the existing OEX logo asset.
 
-### 5. Diamond Face
-**Reference**: "Narrow forehead AND chin, cheekbones widest"
-- Add explicit check that BOTH forehead and jaw are narrower than cheekbones
-- Current algorithm checks this but could weight it higher
+### 5. Create Install Button Component (`src/components/PWAInstallButton.tsx`)
+- Listen for the `beforeinstallprompt` event
+- Show an "Install App" button when the prompt is available
+- Trigger the native install dialog on click
+- Auto-hide after successful installation
+- Show iOS-specific instructions (Share > Add to Home Screen) when on Safari
+- Place the button in the Header component for visibility
 
-### 6. Oblong Face
-**Reference**: "Longer than wide, straight cheek line, similar forehead and jaw width"
-- Increase length-to-width target slightly
-- Add check for straight proportions (forehead roughly equals jaw)
+### 6. Update `src/components/Header.tsx`
+- Import and render the `PWAInstallButton` component alongside the logo
 
-## Algorithm Improvements
+## Files to Create/Modify
 
-### Update `src/lib/faceAnalysis.ts`
+| File | Action |
+|------|--------|
+| `vite.config.ts` | Modify -- add VitePWA plugin config |
+| `index.html` | Modify -- add meta tags for iOS/theme |
+| `public/pwa-192x192.png` | Create -- PWA icon |
+| `public/pwa-512x512.png` | Create -- PWA icon |
+| `src/components/PWAInstallButton.tsx` | Create -- install prompt UI |
+| `src/components/Header.tsx` | Modify -- add install button |
 
-Refine the scoring parameters:
+## Technical Details
 
-| Shape | Parameter | Current | New | Reason |
-|-------|-----------|---------|-----|--------|
-| Oval | lengthToWidthRatio target | 1.4 | 1.35 | "Slightly longer" per reference |
-| Round | Add cheekboneProminence check | 1.0 | 1.05 | "Cheeks typically widest" |
-| Square | foreheadToJawRatio tolerance | 0.08 | 0.05 | "Same width" requires stricter match |
-| Heart | cheekboneProminence weight | 1.5 | 2.0 | "Prominent cheekbones" per reference |
-| Diamond | foreheadToFaceWidth ratio | (missing) | add | "Narrow forehead" is key characteristic |
-| Oblong | lengthToWidthRatio target | 1.6 | 1.5 | Better distinguish from very long faces |
+### Service Worker Caching Strategy
+```text
+App Shell (HTML/CSS/JS)  -->  Precached by Workbox (auto)
+face-api.js models (CDN) -->  CacheFirst (long-lived)
+Google Fonts             -->  StaleWhileRevalidate
+```
 
-### Also Update `src/lib/faceShapeData.ts`
-
-Update the descriptions and characteristics to match your reference definitions exactly:
-
-**Oval**:
-- Description: "Considered the most balanced shape, an oval face is slightly longer than it is wide. It has a gently rounded jawline and forehead that's a little broader than the chin."
-
-**Round**:
-- Description: "Round faces are soft and full, with equal width and length. The cheeks are typically the widest part, and the jawline has minimal angles, giving a youthful, approachable look."
-
-**Square**:
-- Description: "Square faces have a strong, defined jawline with a forehead, cheekbones, and jaw that are about the same width. This shape often gives off a bold, confident impression."
-
-**Heart**:
-- Description: "A heart-shaped face has a wider forehead and a narrow, pointed chin. The cheekbones are often prominent, creating a soft yet striking look."
-
-**Diamond**:
-- Description: "Diamond faces are characterized by a narrow forehead and chin, with the cheekbones being the widest point. This face shape often appears sharp and sculpted."
-
-**Oblong**:
-- Description: "This face is longer than it is wide, with a straight cheek line. The forehead, cheeks, and jaw are close in width, but the overall face length gives it an elegant, elongated appearance."
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/lib/faceAnalysis.ts` | Refine classification parameters to match reference definitions |
-| `src/lib/faceShapeData.ts` | Update descriptions to match your exact reference text |
-
-## Expected Outcome
-- Face shape detection will align with the official definitions you provided
-- More accurate differentiation between similar shapes (Round vs Oval, Heart vs Diamond)
-- User-facing descriptions match industry-standard definitions
+### Offline Behavior
+After first visit, the app works fully offline: the app shell and ML models are cached locally. Users can analyze face shapes without an internet connection.
 
