@@ -262,6 +262,10 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
     { value: cheekboneProminence, target: 1.18, tolerance: 0.08, weight: 2.5 },
     { value: foreheadToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 },
     { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 },
+    { value: lengthToWidthRatio, target: 1.35, tolerance: 0.15, weight: 1.5 },
+    { value: cheekboneProminence, target: 1.10, tolerance: 0.08, weight: 2.0 },
+    { value: foreheadToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.0 },
+    { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.0 },
   ]);
   scores.push({ shapeId: 'diamond', score: diamondScore });
 
