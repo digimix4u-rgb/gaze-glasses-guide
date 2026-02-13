@@ -207,32 +207,31 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   let shapeId: string;
 
   // 1. OBLONG/RECTANGLE: Long face (checked first)
-  if (lengthToWidthRatio >= 1.35) {
+  if (lengthToWidthRatio >= 1.23) {
     if (jawAngle < 133) {
-      shapeId = 'rectangle'; // Long + angular jaw
+      shapeId = 'rectangle';
     } else {
-      shapeId = 'oblong';    // Long + rounded jaw
+      shapeId = 'oblong';
     }
   }
-  // 2. HEART: Wide forehead relative to jaw
-  else if (foreheadToJawRatio > 1.18 && lengthToWidthRatio >= 1.15) {
+  // 2. HEART: Wide forehead AND narrow jaw AND not too long
+  else if (foreheadToJawRatio > 1.2 && jawToCheekRatio < 0.75 && lengthToWidthRatio < 1.23) {
     shapeId = 'heart';
   }
   // 3. DIAMOND: Narrow forehead and jaw, wide cheeks
-  else if (jawToCheekRatio < 0.72 && foreheadToJawRatio < 1.08 &&
-           Math.abs(foreheadWidth - jawWidth) / cheekboneWidth < 0.12) {
+  else if (jawToCheekRatio < 0.72 && foreheadToJawRatio < 1.08) {
     shapeId = 'diamond';
   }
-  // 4. SQUARE: Angular jaw, similar widths, shorter face
-  else if (jawAngle < 133 && jawToCheekRatio > 0.78 && lengthToWidthRatio < 1.35) {
+  // 4. SQUARE: Angular jaw, similar widths
+  else if (jawAngle < 133 && jawToCheekRatio > 0.78) {
     shapeId = 'square';
   }
-  // 5. ROUND: Very short, very rounded jaw
+  // 5. ROUND: Very short, very rounded
   else if (lengthToWidthRatio < 1.15 && jawAngle > 143) {
     shapeId = 'round';
   }
-  // 6. OVAL: Balanced proportions, rounded jaw
-  else if (jawAngle >= 133 && lengthToWidthRatio >= 1.15 && lengthToWidthRatio < 1.35) {
+  // 6. OVAL: Balanced, rounded jaw, medium length
+  else if (jawAngle >= 133 && lengthToWidthRatio >= 1.1 && lengthToWidthRatio < 1.23) {
     shapeId = 'oval';
   }
   // Fallback
@@ -246,25 +245,25 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   const rawScores: Record<string, number> = {};
   
   // Oblong: long face + rounded jaw
-  rawScores['oblong'] = Math.max(0, (1 - Math.abs(lengthToWidthRatio - 1.5) / 0.4) + (jawAngle >= 133 ? 1 : 0)) / 2;
+  rawScores['oblong'] = Math.max(0, (1 - Math.abs(lengthToWidthRatio - 1.4) / 0.4) + (jawAngle >= 133 ? 1 : 0)) / 2;
   
   // Rectangle: long face + angular jaw
-  rawScores['rectangle'] = Math.max(0, (1 - Math.abs(lengthToWidthRatio - 1.5) / 0.4) + (jawAngle < 133 ? 1 : 0)) / 2;
+  rawScores['rectangle'] = Math.max(0, (1 - Math.abs(lengthToWidthRatio - 1.4) / 0.4) + (jawAngle < 133 ? 1 : 0)) / 2;
   
   // Diamond: narrow forehead + narrow jaw relative to cheekbones
   rawScores['diamond'] = Math.max(0, (1 - jawToCheekRatio / 0.72) + (foreheadToJawRatio < 1.08 ? 1 : 0)) / 2;
   
-  // Heart: wide forehead relative to jaw
-  rawScores['heart'] = Math.max(0, (foreheadToJawRatio - 1.0) / 0.3 + (lengthToWidthRatio >= 1.15 ? 0.5 : 0)) / 1.5;
+  // Heart: wide forehead relative to jaw + narrow jaw
+  rawScores['heart'] = Math.max(0, (foreheadToJawRatio - 1.0) / 0.3 + (jawToCheekRatio < 0.75 ? 0.5 : 0)) / 1.5;
   
-  // Square: angular jaw + wide jaw + shorter face
+  // Square: angular jaw + wide jaw
   rawScores['square'] = Math.max(0, (1 - Math.abs(lengthToWidthRatio - 1.1) / 0.3) + (jawAngle < 133 ? 1 : 0) + (jawToCheekRatio > 0.78 ? 1 : 0)) / 3;
   
   // Round: short ratio + very soft jaw
   rawScores['round'] = Math.max(0, (1 - Math.abs(lengthToWidthRatio - 1.0) / 0.2) + (jawAngle > 143 ? 1 : 0)) / 2;
   
   // Oval: medium ratio + soft jaw
-  rawScores['oval'] = Math.max(0, (1 - Math.abs(lengthToWidthRatio - 1.25) / 0.2) + (jawAngle >= 133 ? 1 : 0)) / 2;
+  rawScores['oval'] = Math.max(0, (1 - Math.abs(lengthToWidthRatio - 1.16) / 0.2) + (jawAngle >= 133 ? 1 : 0)) / 2;
   
   // Boost the winner
   rawScores[shapeId] = Math.max(rawScores[shapeId], 0.5);
