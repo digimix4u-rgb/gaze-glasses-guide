@@ -8,7 +8,6 @@ import { faceShapes, getFaceShapeById, FaceShape, Gender } from "@/lib/faceShape
 import { FaceAnalysisResult } from "@/lib/faceAnalysis";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { RefreshCw, Sparkles, AlertCircle, Loader2, Brain } from "lucide-react";
-import LandmarkDebugOverlay from "./LandmarkDebugOverlay";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 
@@ -222,13 +221,6 @@ const AnalysisSection = () => {
                 </div>
 
                 <div className="space-y-6">
-                  {faceMeasurements && faceLandmarks && photoFile && (
-                    <LandmarkDebugOverlay
-                      photoFile={photoFile}
-                      measurements={faceMeasurements}
-                      landmarks={faceLandmarks}
-                    />
-                  )}
                   {faceMeasurements && (
                     <FacialFeatures measurements={faceMeasurements} />
                   )}
