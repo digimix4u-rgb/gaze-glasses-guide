@@ -1,39 +1,51 @@
 
 
-## Fix Heart vs Oblong Classification Priority
+## Fix Heart vs Diamond Misclassification
 
 ### Problem
-The face has a `lengthToWidthRatio` of **1.296** and a `foreheadToJawRatio` of **1.056**. The oblong check (`faceLength > cheekboneWidth * 1.25`) fires first, so the face never reaches the heart detection logic. Heart-shaped faces are naturally elongated, making them vulnerable to being misclassified as oblong.
+The heart shape check requires `foreheadWidth > jawWidth * 1.15`, but for this face the ratio is likely just below that threshold. It falls through to the diamond check (cheekbones are widest), resulting in a "diamond" classification instead of "heart."
+
+Heart and diamond shapes both have wide cheekbones, but the key differentiator is:
+- **Heart**: Wide forehead + narrow/pointed chin
+- **Diamond**: Narrow forehead AND narrow jaw relative to cheekbones
 
 ### Solution
-Reorder the classification logic so that **heart shape is checked before oblong**, and raise the oblong threshold slightly. A face should only be oblong if it's elongated AND doesn't have a significantly wider forehead relative to jaw.
+Two changes in `src/lib/faceAnalysis.ts`, in the `classifyFaceShape` function:
 
-### Changes
+1. **Lower the heart forehead-to-jaw threshold** from `1.15` to `1.10` -- many heart shapes have a moderately (not dramatically) wider forehead than jaw.
 
-**File: `src/lib/faceAnalysis.ts`** -- Update the `classifyFaceShape` function
+2. **Add chin narrowness as a heart indicator** -- if the chin-to-jaw ratio is low (pointed chin), that strongly suggests heart shape even when forehead-to-jaw ratio is borderline. Add an alternative heart condition: `foreheadWidth > jawWidth * 1.05 AND chinToJawRatio < 0.7`.
 
-Reorder and adjust the classification conditions:
+3. **Tighten diamond detection** -- diamond should only match when the forehead is genuinely narrow relative to cheekbones (not just slightly narrower). Add a guard: only classify as diamond if `foreheadWidth < cheekboneWidth * 0.88`.
+
+### Technical Details
+
+**File: `src/lib/faceAnalysis.ts`** (lines 196-203)
 
 ```text
-OLD ORDER:
-1. Oblong (lengthToWidth > 1.25)
-2. Heart (forehead > jaw * 1.15)
-3. Heart secondary (cheekbones widest but forehead close)
-4. Diamond / Round
-5. Square / Round
-6. Oval
+CURRENT:
+  if (foreheadWidth > jawWidth * 1.15 && (largestWidth === 'forehead' || foreheadWidth >= cheekboneWidth * 0.92)) {
+    shapeId = 'heart';
+  } else if (...oblong...) {
+  } else if (largestWidth === 'cheekbones' && cheekboneWidth > foreheadWidth && cheekboneWidth > jawWidth) {
+    shapeId = (faceLength > cheekboneWidth) ? 'diamond' : 'round';
 
-NEW ORDER:
-1. Heart (forehead > jaw * 1.15) -- check first regardless of length
-2. Heart secondary (cheekbones widest, forehead near cheekbone width, forehead > jaw)
-3. Oblong (lengthToWidth > 1.3 AND not heart-like proportions)
-4. Diamond / Round
-5. Square / Round
-6. Oval
+NEW:
+  if (foreheadWidth > jawWidth * 1.10 && (largestWidth === 'forehead' || foreheadWidth >= cheekboneWidth * 0.92)) {
+    shapeId = 'heart';
+  } else if (foreheadWidth > jawWidth * 1.05 && chinToJawRatio < 0.7) {
+    // Pointed chin with moderately wider forehead = heart
+    shapeId = 'heart';
+  } else if (...oblong...) {
+  } else if (largestWidth === 'cheekbones' && cheekboneWidth > foreheadWidth && cheekboneWidth > jawWidth) {
+    // Only diamond if forehead is genuinely narrow relative to cheekbones
+    if (foreheadWidth < cheekboneWidth * 0.88) {
+      shapeId = (faceLength > cheekboneWidth) ? 'diamond' : 'round';
+    } else {
+      // Forehead is close to cheekbone width -- likely oval or heart, not diamond
+      shapeId = (faceLength > cheekboneWidth) ? 'oval' : 'round';
+    }
+  }
 ```
 
-Key changes:
-- Move heart checks before oblong so elongated heart shapes are caught
-- Raise oblong threshold from 1.25 to 1.3 to reduce false positives
-- Add a guard on oblong: only classify as oblong if `foreheadToJawRatio < 1.1` (if forehead is notably wider than jaw, it's more likely heart than oblong)
-
+This adds chin pointedness as a heart-shape signal and prevents faces with wide foreheads from falling into diamond classification.
