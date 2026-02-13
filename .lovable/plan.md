@@ -1,51 +1,56 @@
 
 
-## Fix Heart vs Diamond Misclassification
+## Replace Classification Logic with User-Provided Algorithm
 
 ### Problem
-The heart shape check requires `foreheadWidth > jawWidth * 1.15`, but for this face the ratio is likely just below that threshold. It falls through to the diamond check (cheekbones are widest), resulting in a "diamond" classification instead of "heart."
-
-Heart and diamond shapes both have wide cheekbones, but the key differentiator is:
-- **Heart**: Wide forehead + narrow/pointed chin
-- **Diamond**: Narrow forehead AND narrow jaw relative to cheekbones
+The current classification logic has gone through multiple iterations of fixes for heart/diamond/oblong misclassification, resulting in complex, interleaved conditions. The user has provided a cleaner, more straightforward algorithm that should be used instead.
 
 ### Solution
-Two changes in `src/lib/faceAnalysis.ts`, in the `classifyFaceShape` function:
+Replace the classification logic in `classifyFaceShape` (lines 183-223) with the user's provided algorithm, adapted to the existing code structure. The new logic has no triangular shape (which we don't support), and follows a clearer priority order:
 
-1. **Lower the heart forehead-to-jaw threshold** from `1.15` to `1.10` -- many heart shapes have a moderately (not dramatically) wider forehead than jaw.
-
-2. **Add chin narrowness as a heart indicator** -- if the chin-to-jaw ratio is low (pointed chin), that strongly suggests heart shape even when forehead-to-jaw ratio is borderline. Add an alternative heart condition: `foreheadWidth > jawWidth * 1.05 AND chinToJawRatio < 0.7`.
-
-3. **Tighten diamond detection** -- diamond should only match when the forehead is genuinely narrow relative to cheekbones (not just slightly narrower). Add a guard: only classify as diamond if `foreheadWidth < cheekboneWidth * 0.88`.
+1. **Oblong** -- `lengthToWidthRatio > 1.4`
+2. **Diamond** -- Cheekbones wider than both forehead and jaw, with both forehead and jaw below 85% of cheekbone width
+3. **Heart** -- Forehead is widest (or equal to cheekbones) and wider than jaw
+4. **Round vs Square** -- `lengthToWidthRatio` between 0.9 and 1.1; square if jaw is near cheekbone width
+5. **Oval** -- Face longer than wide, forehead wider than jaw (fallback)
 
 ### Technical Details
 
-**File: `src/lib/faceAnalysis.ts`** (lines 196-203)
+**File: `src/lib/faceAnalysis.ts`** -- lines 183-223
 
-```text
-CURRENT:
-  if (foreheadWidth > jawWidth * 1.15 && (largestWidth === 'forehead' || foreheadWidth >= cheekboneWidth * 0.92)) {
-    shapeId = 'heart';
-  } else if (...oblong...) {
-  } else if (largestWidth === 'cheekbones' && cheekboneWidth > foreheadWidth && cheekboneWidth > jawWidth) {
-    shapeId = (faceLength > cheekboneWidth) ? 'diamond' : 'round';
+Remove unused variables (`isLengthSignificant`, `isRoundOrSquare`, `widths`, `largestWidth`, `chinToJawRatio` destructuring) and replace the classification block:
 
-NEW:
-  if (foreheadWidth > jawWidth * 1.10 && (largestWidth === 'forehead' || foreheadWidth >= cheekboneWidth * 0.92)) {
-    shapeId = 'heart';
-  } else if (foreheadWidth > jawWidth * 1.05 && chinToJawRatio < 0.7) {
-    // Pointed chin with moderately wider forehead = heart
-    shapeId = 'heart';
-  } else if (...oblong...) {
-  } else if (largestWidth === 'cheekbones' && cheekboneWidth > foreheadWidth && cheekboneWidth > jawWidth) {
-    // Only diamond if forehead is genuinely narrow relative to cheekbones
-    if (foreheadWidth < cheekboneWidth * 0.88) {
-      shapeId = (faceLength > cheekboneWidth) ? 'diamond' : 'round';
-    } else {
-      // Forehead is close to cheekbone width -- likely oval or heart, not diamond
-      shapeId = (faceLength > cheekboneWidth) ? 'oval' : 'round';
-    }
-  }
+```typescript
+const lengthToWidthRatio = faceLength / cheekboneWidth;
+
+let shapeId: string;
+
+// 1. OBLONG: Face is noticeably longer than it is wide
+if (lengthToWidthRatio > 1.4) {
+  shapeId = 'oblong';
+}
+// 2. DIAMOND: Cheekbones significantly wider than both forehead and jaw
+else if (cheekboneWidth > foreheadWidth && cheekboneWidth > jawWidth
+  && foreheadWidth < cheekboneWidth * 0.85 && jawWidth < cheekboneWidth * 0.85) {
+  shapeId = 'diamond';
+}
+// 3. HEART: Forehead is widest part and wider than jaw
+else if (foreheadWidth >= cheekboneWidth && foreheadWidth > jawWidth) {
+  shapeId = 'heart';
+}
+// 4. ROUND vs SQUARE: Face length and width are similar
+else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.1) {
+  shapeId = (jawWidth >= cheekboneWidth * 0.9) ? 'square' : 'round';
+}
+// 5. OVAL: Balanced proportions
+else if (faceLength > cheekboneWidth && foreheadWidth > jawWidth) {
+  shapeId = 'oval';
+}
+// Final fallback
+else {
+  shapeId = 'oval';
+}
 ```
 
-This adds chin pointedness as a heart-shape signal and prevents faces with wide foreheads from falling into diamond classification.
+Also clean up the destructuring at line 175-181 to remove `chinToJawRatio` since it's no longer used in classification logic (it's still computed in measurements for display).
+
