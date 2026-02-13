@@ -7,6 +7,7 @@ interface FacialFeaturesProps {
 
 const FacialFeatures = ({ measurements }: FacialFeaturesProps) => {
   const {
+    faceLength,
     lengthToWidthRatio,
     foreheadToJawRatio,
     cheekboneProminence,
@@ -121,6 +122,18 @@ const FacialFeatures = ({ measurements }: FacialFeaturesProps) => {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="mt-4 p-4 rounded-xl bg-muted/20 border border-border/30">
+        <h5 className="text-sm font-medium text-muted-foreground mb-2">Raw Measurements</h5>
+        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <span>Face Length: <strong className="text-foreground">{faceLength.toFixed(0)}</strong></span>
+          <span>Forehead (temple-temple): <strong className="text-foreground">{foreheadWidth.toFixed(0)}</strong></span>
+          <span>Cheekbones (ear-ear): <strong className="text-foreground">{cheekboneWidth.toFixed(0)}</strong></span>
+          <span>Jaw Width: <strong className="text-foreground">{jawWidth.toFixed(0)}</strong></span>
+          <span>Length:Width Ratio: <strong className="text-foreground">{lengthToWidthRatio.toFixed(2)}</strong></span>
+          <span>Forehead:Jaw Ratio: <strong className="text-foreground">{foreheadToJawRatio.toFixed(2)}</strong></span>
+        </div>
       </div>
     </div>
   );
