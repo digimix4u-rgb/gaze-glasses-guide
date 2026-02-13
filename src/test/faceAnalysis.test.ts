@@ -56,12 +56,13 @@ describe("Diamond Face Shape Detection", () => {
       { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.0 }, // NEW: weight 2.0
     ]);
 
-    // Test with OLD parameters (duplicate-ridden version)
+    // Test with one set of OLD parameters (before removing duplicates)
+    // Note: The actual old code had 8 duplicate parameters; this is just one set for comparison
     const oldDiamondScore = calculateWeightedShapeScore([
       { value: measurements.lengthToWidthRatio, target: 1.35, tolerance: 0.12, weight: 1.5 },
-      { value: measurements.cheekboneProminence, target: 1.18, tolerance: 0.08, weight: 2.5 }, // OLD: target 1.18, tolerance 0.08, weight 2.5
-      { value: foreheadToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 }, // OLD: weight 2.5
-      { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 }, // OLD: weight 2.5
+      { value: measurements.cheekboneProminence, target: 1.18, tolerance: 0.08, weight: 2.5 },
+      { value: foreheadToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 },
+      { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 },
     ]);
 
     // New score should be reasonable (between 0 and 1)
@@ -99,7 +100,7 @@ describe("Diamond Face Shape Detection", () => {
       { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.0 },
     ]);
 
-    // Old parameters with duplicate issues
+    // Old parameters (first set from the duplicate-ridden version)
     const oldScore = calculateWeightedShapeScore([
       { value: measurements.lengthToWidthRatio, target: 1.35, tolerance: 0.12, weight: 1.5 },
       { value: measurements.cheekboneProminence, target: 1.18, tolerance: 0.08, weight: 2.5 },
@@ -112,23 +113,23 @@ describe("Diamond Face Shape Detection", () => {
   });
 
   it("should have more balanced weights", () => {
-    // Verify that total weight is more balanced
+    // Verify that the new weights are more balanced
     const newWeights = [1.5, 2.5, 2.0, 2.0]; // lengthToWidthRatio, cheekboneProminence, foreheadToFaceWidth, jawToFaceWidth
-    const oldWeights = [1.5, 2.5, 2.5, 2.5]; // Before removing duplicates
+    const oldFirstSetWeights = [1.5, 2.5, 2.5, 2.5]; // First set from duplicate-ridden version
 
     const newTotalWeight = newWeights.reduce((sum, w) => sum + w, 0);
-    const oldTotalWeight = oldWeights.reduce((sum, w) => sum + w, 0);
+    const oldFirstSetTotal = oldFirstSetWeights.reduce((sum, w) => sum + w, 0);
 
     // New total weight should be 8.0
     expect(newTotalWeight).toBe(8.0);
     
-    // Old total weight should be 9.0
-    expect(oldTotalWeight).toBe(9.0);
+    // Old first set total was 9.0
+    expect(oldFirstSetTotal).toBe(9.0);
 
-    // New parameters should have more balanced distribution
-    // foreheadToFaceWidth and jawToFaceWidth now have weight 2.0 instead of 2.5 for better balance
+    // New parameters have more balanced weight distribution
+    // foreheadToFaceWidth and jawToFaceWidth now have weight 2.0 instead of 2.5
     const newForeheadRatio = 2.0 / newTotalWeight;
-    const oldForeheadRatio = 2.5 / oldTotalWeight;
+    const oldForeheadRatio = 2.5 / oldFirstSetTotal;
 
     expect(newForeheadRatio).toBeLessThan(oldForeheadRatio);
     expect(newForeheadRatio).toBeCloseTo(0.25, 2);
