@@ -145,6 +145,29 @@ export const faceShapes: FaceShape[] = [
       "Boxy styles",
       "Frames wider than cheekbones"
     ]
+  },
+  {
+    id: "rectangle",
+    name: "Rectangle",
+    description: "A rectangle face is longer than it is wide with a strong, angular jawline. The forehead, cheekbones, and jaw are similar in width, creating a structured, elongated appearance.",
+    characteristics: [
+      "Longer than wide",
+      "Strong, angular jawline",
+      "Forehead, cheekbones, and jaw similar in width",
+      "Structured, elongated appearance"
+    ],
+    recommendations: [
+      "Round frames",
+      "Oval frames",
+      "Wide frames to add width",
+      "Decorative temples",
+      "Deep frames to shorten face"
+    ],
+    avoidStyles: [
+      "Narrow frames",
+      "Small frames",
+      "Square frames that emphasize angles"
+    ]
   }
 ];
 
