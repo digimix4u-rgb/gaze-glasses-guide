@@ -1,65 +1,105 @@
 
 
-## Add Landmark Visualization + Fix Heart Classification
+## Add Jawline Angle Detection to Face Shape Classification
 
-### Overview
-Two changes: (1) Create a visual overlay component that draws the measurement lines directly on the uploaded photo so you can see exactly what the AI is measuring, and (2) investigate and fix why hearts are still classified as oval.
+### What This Changes
+The app currently classifies face shapes using only width ratios (forehead vs cheekbones vs jaw). This misses a critical signal: **jawline angularity**. A square face and an oval face can have similar width ratios, but the jaw *angle* is very different -- square jaws have a sharp bend, oval jaws have a smooth curve.
 
-### 1. New Component: `FaceLandmarkOverlay`
+This upgrade adds jawline angle measurement using three points along the jaw contour and integrates it into both the classification logic and the visual overlay.
 
-Create `src/components/FaceLandmarkOverlay.tsx` -- a canvas-based component that draws on top of the uploaded photo:
+### How Jaw Angle Calculation Works
 
-- Takes the photo file, landmarks, and measurements as props
-- Draws the image on a canvas, then overlays colored measurement lines:
-  - **Green line**: Forehead width (temple to temple, landmarks 21-251)
-  - **Blue line**: Cheekbone width (ear to ear, landmarks 234-454)
-  - **Red line**: Jaw width (jaw angle to jaw angle, landmarks 172-397)
-  - **Yellow line**: Face length (top of head to chin, landmarks 10-152)
-- Labels each line with its pixel value
-- Dots on each landmark point used for measurement
+The jaw angle is measured at the gonial angle point (where the jaw turns from the side of the face toward the chin). We use three MediaPipe landmarks per side:
 
-This gives full transparency into what the AI is detecting.
+- **Point A**: Cheekbone/ear area (landmark 234 or 454) -- above the jaw
+- **Point B**: Jaw angle (landmark 172 or 397) -- the corner of the jaw
+- **Point C**: Chin area (landmark 152) -- below the jaw
 
-### 2. Display in Results
+The angle at point B tells us how sharp the jaw corner is:
+- Less than 130 degrees = angular/square jaw
+- 130-140 degrees = moderate/defined jaw  
+- Greater than 140 degrees = rounded/soft jaw
 
-Update `src/components/AnalysisSection.tsx` to show the landmark overlay in the results view:
+We average the left and right jaw angles for the final measurement.
 
-- Store the photo URL so it persists to the results screen
-- Add the `FaceLandmarkOverlay` component in the left column of the results grid, above or alongside the face shape card
-- Shows the photo with measurement lines drawn on it
+### Changes
 
-### 3. Fix Heart Classification Threshold
+**File: `src/lib/faceAnalysis.ts`**
 
-The current heart rule requires `jawToCheekRatio < 0.75`, which is very strict. With ear-to-ear cheekbone measurements, the jaw-to-cheek ratio for heart faces is often around 0.75-0.82 (the jaw is narrower but not drastically so). 
+1. Add a `calculateAngle` helper function that computes the angle at point B given three points A, B, C using the dot product formula:
+   ```
+   angle = arccos((BA . BC) / (|BA| * |BC|))
+   ```
 
-Update in `src/lib/faceAnalysis.ts`:
-- Relax the jaw threshold for heart from `< 0.75` to `< 0.82`
-- Add a chin-to-jaw ratio check: heart faces have a pointed chin (`chinToJawRatio < 0.6`)
-- Adjust diamond threshold similarly to `< 0.78` to keep it distinct from heart
+2. Add jaw angle landmarks to the LANDMARKS object:
+   - `jawAngleAboveLeft: 132` (point on cheek contour above left jaw angle)
+   - `jawAngleAboveRight: 361` (point on cheek contour above right jaw angle)
 
-Updated heart rule:
-```
-// HEART: Forehead relatively wide + jaw tapers + pointed chin
-else if (foreheadToCheekRatio > 0.82 && jawToCheekRatio < 0.82 && chinToJawRatio < 0.6) {
-  shapeId = 'heart';
-}
-```
+3. Compute left and right jaw angles in `analyzeFace()` using:
+   - Left: angle at landmark 172, between landmarks 132 (above) and 152 (chin)
+   - Right: angle at landmark 397, between landmarks 361 (above) and 152 (chin)
+   - Average both for `jawAngle`
+
+4. Add `jawAngle` to the measurements interface and object
+
+5. Update `classifyFaceShape` with the new jaw angle signal:
+   - **Oblong**: lengthToWidthRatio > 1.5 (tightened from 1.4)
+   - **Diamond**: foreheadToCheekRatio < 0.80 AND jawToCheekRatio < 0.78
+   - **Heart**: foreheadToCheekRatio > 0.82 AND jawToCheekRatio < 0.82 AND chinToJawRatio < 0.6
+   - **Square**: lengthToWidthRatio 0.9-1.2 AND jawAngle < 130 AND jawToCheekRatio >= 0.80
+   - **Round**: lengthToWidthRatio 0.9-1.1 AND jawAngle > 140
+   - **Oval**: balanced proportions, jawAngle 130-155, lengthToWidthRatio 1.2-1.5
+
+6. Replace fake random scores with actual distance-based scoring for each shape, so the confidence percentages are meaningful rather than random.
+
+**File: `src/components/FaceLandmarkOverlay.tsx`**
+
+7. Add jaw angle visualization to the overlay:
+   - Draw two angled lines (purple/magenta) showing the jaw angle on each side
+   - Label with the measured angle in degrees
+   - Add to the legend at the bottom
+
+**File: `src/components/FacialFeatures.tsx`**
+
+8. Add a "Jawline Angle" row to the facial features display:
+   - Show the angle in degrees
+   - Descriptive label: "Angular" (< 130), "Defined" (130-140), "Soft/Rounded" (> 140)
+9. Add jawAngle to the Raw Measurements section
 
 ### Technical Details
 
-**New file: `src/components/FaceLandmarkOverlay.tsx`**
-- Uses HTML Canvas API to draw the image and overlay lines
-- Scales canvas to fit container while maintaining aspect ratio
-- Draws 4 colored measurement lines with endpoint dots and text labels
-- Props: `photoFile: File`, `landmarks: FaceLandmarks`, `measurements: FaceAnalysisResult['measurements']`
+**New helper function:**
+```typescript
+function calculateAngle(
+  pointA: { x: number; y: number },
+  pointB: { x: number; y: number },  // vertex
+  pointC: { x: number; y: number }
+): number {
+  const BA = { x: pointA.x - pointB.x, y: pointA.y - pointB.y };
+  const BC = { x: pointC.x - pointB.x, y: pointC.y - pointB.y };
+  const dot = BA.x * BC.x + BA.y * BC.y;
+  const magBA = Math.sqrt(BA.x * BA.x + BA.y * BA.y);
+  const magBC = Math.sqrt(BC.x * BC.x + BC.y * BC.y);
+  const cosAngle = Math.max(-1, Math.min(1, dot / (magBA * magBC)));
+  return Math.acos(cosAngle) * (180 / Math.PI);
+}
+```
 
-**Modified: `src/components/AnalysisSection.tsx`**
-- Keep `photoFile` URL available in results view (don't revoke URL until reset)
-- Import and render `FaceLandmarkOverlay` in the results grid
+**Updated classification priority:**
+1. Oblong (ratio > 1.5)
+2. Diamond (narrow forehead + narrow jaw)
+3. Heart (wide forehead + narrow jaw + pointed chin)
+4. Square (short face + angular jaw < 130 + wide jaw)
+5. Round (short face + soft jaw > 140)
+6. Oval (everything else with balanced proportions)
 
-**Modified: `src/lib/faceAnalysis.ts`**
-- Pass `chinToJawRatio` into classification function
-- Relax heart jaw threshold from 0.75 to 0.82
-- Add chin pointedness check for heart detection
-- Adjust diamond to use `< 0.78` for jaw ratio
+**Updated measurements interface** adds:
+```typescript
+jawAngle: number;  // average jaw angle in degrees
+```
 
+### What You'll See
+- The photo overlay will now show purple angle lines at both jaw corners with the degree measurement
+- The facial features panel will display "Jawline Angle: X degrees -- Angular/Defined/Soft"
+- Square faces will be correctly identified because their jaw angle will be under 130 degrees
+- The raw measurements section will include the jaw angle value
