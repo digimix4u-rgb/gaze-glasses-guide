@@ -480,7 +480,7 @@ export async function analyzeFace(
     console.log('Shape Scores:', classification.allScores);
     console.log('Final Classification:', {
       shape: classification.shapeId,
-      confidence: classification.confidence + '%'
+      confidence: `${classification.confidence}%`
     });
     console.groupEnd();
   }
