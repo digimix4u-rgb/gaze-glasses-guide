@@ -1,66 +1,96 @@
 
 
-# Add Progressive Web App (PWA) Capabilities
+# Migrate Face Detection to @mediapipe/tasks-vision
 
 ## Overview
-Add PWA features to the existing face shape detection app, enabling offline use, home screen installation, and cached model files -- all while keeping existing functionality unchanged.
+Replace the current `face-api.js` library with Google's `@mediapipe/tasks-vision` FaceLandmarker for face detection and landmark extraction. This is Google's latest, actively maintained solution with better accuracy, faster inference via WebAssembly/WebGL, and 478-point face mesh landmarks (vs. 68 points from face-api.js).
+
+## Why @mediapipe/tasks-vision
+- Actively maintained by Google (face-api.js is unmaintained)
+- 478 landmark points provide far more precise facial measurements
+- Uses optimized WASM/WebGL runtime for better performance
+- Smaller model files with CDN-hosted WASM binaries
+- Better cross-browser compatibility
 
 ## Changes
 
-### 1. Install `vite-plugin-pwa`
-Add the `vite-plugin-pwa` package, which handles manifest generation, service worker creation, and precaching automatically via Workbox.
+### 1. Swap Dependencies
+- **Remove**: `face-api.js`
+- **Add**: `@mediapipe/tasks-vision`
+- **Remove** (already unused): `@mediapipe/face_mesh`, `@tensorflow-models/face-landmarks-detection`, `@tensorflow/tfjs`
 
-### 2. Update `vite.config.ts`
-Configure the PWA plugin with:
-- **Manifest**: name "Frame Finder", short_name "FrameFinder", theme_color "#E31E24", background_color "#fafafa", display "standalone", orientation "portrait", start_url "/"
-- **Icons**: Reference 192x192 and 512x512 icons (using the existing logo)
-- **Service Worker (Workbox)**: 
-  - Precache the app shell (HTML, CSS, JS)
-  - Runtime caching rule for `cdn.jsdelivr.net` (face-api.js models) using **CacheFirst** strategy
-  - Runtime caching for Google Fonts using **StaleWhileRevalidate**
-- **Register type**: autoUpdate (seamless updates)
+### 2. Rewrite `src/lib/faceAnalysis.ts`
+This is the only file that imports `face-api.js`, so the migration is contained.
 
-### 3. Update `index.html`
-- Add `<meta name="theme-color" content="#E31E24">`
-- Add `<link rel="apple-touch-icon" href="/pwa-192x192.png">`
-- Add `<meta name="apple-mobile-web-app-capable" content="yes">`
-- Add `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`
-- The manifest link is auto-injected by the plugin
+**Initialization:**
+- Use `FilesetResolver.forVisionTasks()` to load WASM files from CDN
+- Use `FaceLandmarker.createFromModelPath()` with the official face landmarker model from Google's storage
+- Configure for IMAGE mode with 1 face
 
-### 4. Create PWA Icons
-Generate simple icon files at `public/pwa-192x192.png` and `public/pwa-512x512.png` using the existing OEX logo asset.
+**Landmark Mapping:**
+The 478-point MediaPipe mesh uses different indices than the 68-point model. Key mappings:
 
-### 5. Create Install Button Component (`src/components/PWAInstallButton.tsx`)
-- Listen for the `beforeinstallprompt` event
-- Show an "Install App" button when the prompt is available
-- Trigger the native install dialog on click
-- Auto-hide after successful installation
-- Show iOS-specific instructions (Share > Add to Home Screen) when on Safari
-- Place the button in the Header component for visibility
+| Measurement | face-api.js (68pt) | MediaPipe (478pt) |
+|---|---|---|
+| Forehead width | Points 17, 26 (brow outer) | Points 70, 300 (forehead) |
+| Cheekbone width | Points 1, 15 (upper jaw) | Points 234, 454 (cheekbones) |
+| Jaw width | Points 4, 12 (mid jaw) | Points 172, 397 (jaw) |
+| Chin | Point 8 | Point 152 |
+| Chin width | Points 6, 10 | Points 175, 396 |
+| Nose bridge | Point 27 | Point 6 |
+| Eye landmarks | Points 36-47 | Points 33, 133, 159, 145, 263, 362, 386, 374 |
 
-### 6. Update `src/components/Header.tsx`
-- Import and render the `PWAInstallButton` component alongside the logo
+**All existing interfaces stay the same** (`FaceAnalysisResult`, `FaceLandmarks`, `FaceDetectionError`, measurements object) -- only the internal implementation changes.
 
-## Files to Create/Modify
+**Classification logic** (`classifyFaceShape`, `calculateWeightedShapeScore`) remains completely unchanged since it operates on computed ratios, not raw landmarks.
+
+### 3. Update `src/hooks/useFaceDetection.ts`
+No structural changes needed. The hook already calls `initializeFaceDetector()`, `analyzeFace()`, and `isModelReady()` -- these function signatures stay the same.
+
+### 4. Update `vite.config.ts` Service Worker Caching
+Update the CDN caching pattern to also cover MediaPipe WASM files:
+- Add a runtime caching rule for `storage.googleapis.com` (model files)
+- Keep the existing `cdn.jsdelivr.net` rule (now for WASM runtime files)
+
+### 5. Remove Unused Dependencies
+Clean up packages no longer needed:
+- `face-api.js`
+- `@mediapipe/face_mesh` (old MediaPipe, already unused)
+- `@tensorflow-models/face-landmarks-detection` (unused)
+- `@tensorflow/tfjs` (unused)
+
+## Files Modified
 
 | File | Action |
-|------|--------|
-| `vite.config.ts` | Modify -- add VitePWA plugin config |
-| `index.html` | Modify -- add meta tags for iOS/theme |
-| `public/pwa-192x192.png` | Create -- PWA icon |
-| `public/pwa-512x512.png` | Create -- PWA icon |
-| `src/components/PWAInstallButton.tsx` | Create -- install prompt UI |
-| `src/components/Header.tsx` | Modify -- add install button |
+|---|---|
+| `src/lib/faceAnalysis.ts` | Rewrite -- swap face-api.js for @mediapipe/tasks-vision |
+| `vite.config.ts` | Update -- add caching rule for googleapis.com |
+| `package.json` | Update -- swap dependencies |
+
+## What Stays the Same
+- All TypeScript interfaces and types
+- The weighted Gaussian scoring / classification algorithm
+- All UI components (AnalysisSection, PhotoUpload, FacialFeatures, etc.)
+- The `useFaceDetection` hook API
+- PWA functionality and service worker
 
 ## Technical Details
 
-### Service Worker Caching Strategy
+### Initialization Code (new)
 ```text
-App Shell (HTML/CSS/JS)  -->  Precached by Workbox (auto)
-face-api.js models (CDN) -->  CacheFirst (long-lived)
-Google Fonts             -->  StaleWhileRevalidate
+FilesetResolver.forVisionTasks(CDN_WASM_URL)
+  -> FaceLandmarker.createFromModelPath(fileset, MODEL_URL)
+  -> configured for IMAGE mode, 1 face, outputFaceBlendshapes disabled
 ```
 
-### Offline Behavior
-After first visit, the app works fully offline: the app shell and ML models are cached locally. Users can analyze face shapes without an internet connection.
+### Detection Code (new)
+```text
+faceLandmarker.detect(imageElement)
+  -> result.faceLandmarks[0]  (478 NormalizedLandmark points)
+  -> extract measurements using mapped indices
+  -> pass to classifyFaceShape() (unchanged)
+```
+
+### Landmark coordinates
+MediaPipe returns normalized coordinates (0-1), so they need to be scaled by image width/height before distance calculations. This will be handled in the extraction function.
 
