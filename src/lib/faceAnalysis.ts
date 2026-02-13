@@ -197,8 +197,14 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
     shapeId = 'heart';
   }
   // 4. ROUND vs SQUARE: Face length and width are similar
-  else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.1) {
-    shapeId = (jawWidth >= cheekboneWidth * 0.9) ? 'square' : 'round';
+  else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.2) {
+    if (jawWidth >= cheekboneWidth * 0.9) {
+      shapeId = 'square';
+    } else if (lengthToWidthRatio <= 1.1) {
+      shapeId = 'round';
+    } else {
+      shapeId = 'oval';
+    }
   }
   // 5. OVAL: Balanced proportions
   else if (faceLength > cheekboneWidth && foreheadWidth > jawWidth) {
