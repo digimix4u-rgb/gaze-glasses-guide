@@ -258,6 +258,10 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
 
   // Diamond
   const diamondScore = calculateWeightedShapeScore([
+    { value: lengthToWidthRatio, target: 1.35, tolerance: 0.12, weight: 1.5 },
+    { value: cheekboneProminence, target: 1.18, tolerance: 0.08, weight: 2.5 },
+    { value: foreheadToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 },
+    { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 },
     { value: lengthToWidthRatio, target: 1.35, tolerance: 0.15, weight: 1.5 },
     { value: cheekboneProminence, target: 1.10, tolerance: 0.08, weight: 2.0 },
     { value: foreheadToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.0 },
@@ -406,22 +410,22 @@ export async function analyzeFace(
     y: landmarks[index].y * imageHeight,
   });
 
-  // Forehead width: points 70 and 300
+  // Forehead width: points 103 and 332 (outer brow/temple)
   const foreheadLeft = getPoint(LANDMARKS.foreheadLeft);
   const foreheadRight = getPoint(LANDMARKS.foreheadRight);
   const foreheadWidth = calculateDistance(foreheadLeft, foreheadRight);
 
-  // Cheekbone width: points 234 and 454
+  // Cheekbone width: points 123 and 352 (cheekbone prominence)
   const cheekboneLeft = getPoint(LANDMARKS.cheekboneLeft);
   const cheekboneRight = getPoint(LANDMARKS.cheekboneRight);
   const cheekboneWidth = calculateDistance(cheekboneLeft, cheekboneRight);
 
-  // Jaw width: points 172 and 397
+  // Jaw width: points 58 and 288 (jaw angle)
   const jawLeft = getPoint(LANDMARKS.jawLeft);
   const jawRight = getPoint(LANDMARKS.jawRight);
   const jawWidth = calculateDistance(jawLeft, jawRight);
 
-  // Chin width: points 175 and 396
+  // Chin width: points 149 and 378 (lower chin sides)
   const chinLeft = getPoint(LANDMARKS.chinLeft);
   const chinRight = getPoint(LANDMARKS.chinRight);
   const chinWidth = calculateDistance(chinLeft, chinRight);
@@ -449,21 +453,41 @@ export async function analyzeFace(
 
   // Debug logging in development
   if (import.meta.env.DEV) {
-    console.log('[FaceAnalysis] Measurements:', {
+    console.group('[FaceAnalysis] Face Detection Results');
+    console.log('Raw Measurements (pixels):', {
       foreheadWidth: foreheadWidth.toFixed(1),
       cheekboneWidth: cheekboneWidth.toFixed(1),
       jawWidth: jawWidth.toFixed(1),
       chinWidth: chinWidth.toFixed(1),
       faceLength: faceLength.toFixed(1),
+      faceWidth: faceWidth.toFixed(1),
+    });
+    console.log('Key Ratios:', {
       lengthToWidthRatio: measurements.lengthToWidthRatio.toFixed(3),
       foreheadToJawRatio: measurements.foreheadToJawRatio.toFixed(3),
       cheekboneProminence: measurements.cheekboneProminence.toFixed(3),
       chinToJawRatio: measurements.chinToJawRatio.toFixed(3),
     });
+    console.log('Additional Ratios:', {
+      jawToForeheadRatio: (jawWidth / foreheadWidth).toFixed(3),
+      cheekboneToForeheadRatio: (cheekboneWidth / foreheadWidth).toFixed(3),
+      foreheadToFaceWidth: (foreheadWidth / cheekboneWidth).toFixed(3),
+      jawToFaceWidth: (jawWidth / cheekboneWidth).toFixed(3),
+    });
   }
 
   const faceLandmarks = extractFaceLandmarks(landmarks, imageWidth, imageHeight);
   const classification = classifyFaceShape(measurements);
+
+  // Log classification results in development
+  if (import.meta.env.DEV) {
+    console.log('Shape Scores:', classification.allScores);
+    console.log('Final Classification:', {
+      shape: classification.shapeId,
+      confidence: `${classification.confidence}%`
+    });
+    console.groupEnd();
+  }
 
   return {
     faceShapeId: classification.shapeId,
