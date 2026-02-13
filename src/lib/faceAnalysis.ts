@@ -3,8 +3,8 @@ import { FilesetResolver, FaceLandmarker } from '@mediapipe/tasks-vision';
 // MediaPipe 478-point face mesh landmark indices
 export const LANDMARKS = {
   // Forehead (outer brow/temple width)
-  foreheadLeft: 103,
-  foreheadRight: 332,
+  foreheadLeft: 54,
+  foreheadRight: 284,
 
   // Cheekbones (zygomatic prominence)
   cheekboneLeft: 123,
@@ -195,7 +195,9 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
 
   if (isLengthSignificant) {
     shapeId = 'oblong';
-  } else if (largestWidth === 'forehead' && foreheadWidth > jawWidth * 1.2) {
+  } else if (largestWidth === 'forehead' && foreheadWidth > jawWidth * 1.15) {
+    shapeId = 'heart';
+  } else if (largestWidth === 'cheekbones' && foreheadWidth > jawWidth * 1.15 && foreheadWidth >= cheekboneWidth * 0.92) {
     shapeId = 'heart';
   } else if (largestWidth === 'cheekbones' && cheekboneWidth > foreheadWidth && cheekboneWidth > jawWidth) {
     shapeId = (faceLength > cheekboneWidth) ? 'diamond' : 'round';
