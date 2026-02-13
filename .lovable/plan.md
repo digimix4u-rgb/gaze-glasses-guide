@@ -1,46 +1,39 @@
 
 
-## Fix Heart Shape Detection
+## Fix Heart vs Oblong Classification Priority
 
 ### Problem
-The forehead width is measured using MediaPipe landmarks **103** and **332** (inner brow area), which capture a width that is too narrow. For a heart-shaped face, the forehead/temple area is the widest point, but these landmarks sit inside the true temple boundary. As a result:
-- `foreheadWidth` ends up smaller than `cheekboneWidth`
-- The classification logic never reaches the heart shape condition because `largestWidth` is never `'forehead'`
-- The face likely gets classified as Diamond or Oval instead
+The face has a `lengthToWidthRatio` of **1.296** and a `foreheadToJawRatio` of **1.056**. The oblong check (`faceLength > cheekboneWidth * 1.25`) fires first, so the face never reaches the heart detection logic. Heart-shaped faces are naturally elongated, making them vulnerable to being misclassified as oblong.
 
 ### Solution
-Use wider forehead/temple landmark indices that better represent the true forehead width, and add a secondary heart-shape detection path.
+Reorder the classification logic so that **heart shape is checked before oblong**, and raise the oblong threshold slightly. A face should only be oblong if it's elongated AND doesn't have a significantly wider forehead relative to jaw.
 
 ### Changes
 
-**File: `src/lib/faceAnalysis.ts`**
+**File: `src/lib/faceAnalysis.ts`** -- Update the `classifyFaceShape` function
 
-1. **Update forehead landmark indices** -- Replace landmarks 103/332 with landmarks **54/284** (outer temple points) which sit at the widest part of the forehead/temple area and more accurately represent forehead width.
-
-2. **Add a secondary heart detection path** -- In the classification logic, add an additional check: even if cheekbones are technically widest, if the forehead is close to cheekbone width AND significantly wider than the jaw, it should still classify as heart. This handles the common case where cheekbones and forehead are similar but jaw is notably narrow.
-
-3. **Adjust the heart threshold** -- Lower the forehead-to-jaw ratio from 1.2 to 1.15 to catch more heart shapes where the forehead is moderately wider than the jaw.
-
-### Technical Details
+Reorder and adjust the classification conditions:
 
 ```text
-Current landmarks:
-  foreheadLeft: 103  (inner brow)
-  foreheadRight: 332 (inner brow)
+OLD ORDER:
+1. Oblong (lengthToWidth > 1.25)
+2. Heart (forehead > jaw * 1.15)
+3. Heart secondary (cheekbones widest but forehead close)
+4. Diamond / Round
+5. Square / Round
+6. Oval
 
-New landmarks:
-  foreheadLeft: 54   (outer temple)
-  foreheadRight: 284  (outer temple)
+NEW ORDER:
+1. Heart (forehead > jaw * 1.15) -- check first regardless of length
+2. Heart secondary (cheekbones widest, forehead near cheekbone width, forehead > jaw)
+3. Oblong (lengthToWidth > 1.3 AND not heart-like proportions)
+4. Diamond / Round
+5. Square / Round
+6. Oval
 ```
 
-Updated classification logic (pseudocode):
-```text
-1. OBLONG check (unchanged)
-2. HEART check: forehead is largest AND foreheadWidth > jawWidth * 1.15
-3. NEW HEART check: cheekbones are largest BUT foreheadWidth > jawWidth * 1.15
-   AND foreheadWidth >= cheekboneWidth * 0.92 (forehead nearly as wide as cheeks)
-4. DIAMOND check (unchanged, but now only triggers when forehead is NOT close to cheekbone width)
-5. Remaining checks unchanged
-```
+Key changes:
+- Move heart checks before oblong so elongated heart shapes are caught
+- Raise oblong threshold from 1.25 to 1.3 to reduce false positives
+- Add a guard on oblong: only classify as oblong if `foreheadToJawRatio < 1.1` (if forehead is notably wider than jaw, it's more likely heart than oblong)
 
-This ensures heart-shaped faces (wide forehead, narrow jaw) are correctly identified even when cheekbone width is marginally wider than forehead width.
