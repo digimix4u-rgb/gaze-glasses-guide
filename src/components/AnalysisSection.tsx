@@ -8,6 +8,7 @@ import { faceShapes, getFaceShapeById, FaceShape, Gender } from "@/lib/faceShape
 import { FaceAnalysisResult } from "@/lib/faceAnalysis";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { RefreshCw, Sparkles, AlertCircle, Loader2, Brain } from "lucide-react";
+import LandmarkDebugOverlay from "./LandmarkDebugOverlay";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 
@@ -19,6 +20,7 @@ const AnalysisSection = () => {
   const [secondaryMatches, setSecondaryMatches] = useState<{ shapeId: string; score: number }[]>([]);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [faceMeasurements, setFaceMeasurements] = useState<FaceAnalysisResult['measurements'] | null>(null);
+  const [faceLandmarks, setFaceLandmarks] = useState<FaceAnalysisResult['landmarks'] | null>(null);
   
   const imageRef = useRef<HTMLImageElement | null>(null);
   
@@ -45,6 +47,7 @@ const AnalysisSection = () => {
     setConfidence(0);
     setSecondaryMatches([]);
     setFaceMeasurements(null);
+    setFaceLandmarks(null);
     resetDetection();
   };
 
@@ -69,6 +72,7 @@ const AnalysisSection = () => {
           setSecondaryMatches(result.allScores.slice(1, 3));
           // Store measurements for facial features display
           setFaceMeasurements(result.measurements);
+          setFaceLandmarks(result.landmarks);
         }
       }
       
@@ -86,6 +90,7 @@ const AnalysisSection = () => {
     setSecondaryMatches([]);
     setPhotoFile(null);
     setFaceMeasurements(null);
+    setFaceLandmarks(null);
     resetDetection();
   };
 
@@ -217,6 +222,13 @@ const AnalysisSection = () => {
                 </div>
 
                 <div className="space-y-6">
+                  {faceMeasurements && faceLandmarks && photoFile && (
+                    <LandmarkDebugOverlay
+                      photoFile={photoFile}
+                      measurements={faceMeasurements}
+                      landmarks={faceLandmarks}
+                    />
+                  )}
                   {faceMeasurements && (
                     <FacialFeatures measurements={faceMeasurements} />
                   )}
