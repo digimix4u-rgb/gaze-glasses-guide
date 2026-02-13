@@ -3,16 +3,16 @@ import { FilesetResolver, FaceLandmarker } from '@mediapipe/tasks-vision';
 // MediaPipe 478-point face mesh landmark indices
 export const LANDMARKS = {
   // Forehead (outer brow/temple width)
-  foreheadLeft: 54,
-  foreheadRight: 284,
+  foreheadLeft: 21,
+  foreheadRight: 251,
 
-  // Cheekbones (zygomatic prominence)
-  cheekboneLeft: 123,
-  cheekboneRight: 352,
+  // Cheekbones (ear to ear - widest face points)
+  cheekboneLeft: 234,
+  cheekboneRight: 454,
 
-  // Jaw (gonial angle)
-  jawLeft: 58,
-  jawRight: 288,
+  // Jaw (gonial angle on face contour)
+  jawLeft: 172,
+  jawRight: 397,
 
   // Chin
   chin: 152,
