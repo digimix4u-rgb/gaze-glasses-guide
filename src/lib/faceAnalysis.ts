@@ -180,6 +180,8 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   } = measurements;
 
   const lengthToWidthRatio = faceLength / cheekboneWidth;
+  const foreheadToCheekRatio = foreheadWidth / cheekboneWidth;
+  const jawToCheekRatio = jawWidth / cheekboneWidth;
 
   let shapeId: string;
 
@@ -187,18 +189,17 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   if (lengthToWidthRatio > 1.4) {
     shapeId = 'oblong';
   }
-  // 2. DIAMOND: Cheekbones significantly wider than both forehead and jaw
-  else if (cheekboneWidth > foreheadWidth && cheekboneWidth > jawWidth
-    && foreheadWidth < cheekboneWidth * 0.85 && jawWidth < cheekboneWidth * 0.85) {
+  // 2. DIAMOND: Both forehead and jaw are narrow relative to cheekbones
+  else if (foreheadToCheekRatio < 0.80 && jawToCheekRatio < 0.75) {
     shapeId = 'diamond';
   }
-  // 3. HEART: Forehead is widest part and wider than jaw
-  else if (foreheadWidth >= cheekboneWidth && foreheadWidth > jawWidth) {
+  // 3. HEART: Forehead is relatively wide, jaw is narrow
+  else if (foreheadToCheekRatio > 0.85 && jawToCheekRatio < 0.75) {
     shapeId = 'heart';
   }
   // 4. ROUND vs SQUARE: Face length and width are similar
   else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.2) {
-    if (jawWidth >= cheekboneWidth * 0.9) {
+    if (jawToCheekRatio >= 0.85) {
       shapeId = 'square';
     } else if (lengthToWidthRatio <= 1.1) {
       shapeId = 'round';
@@ -206,8 +207,8 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
       shapeId = 'oval';
     }
   }
-  // 5. OVAL: Balanced proportions
-  else if (faceLength > cheekboneWidth && foreheadWidth > jawWidth) {
+  // 5. OVAL: Balanced proportions (default)
+  else if (faceLength > cheekboneWidth && foreheadToCheekRatio > jawToCheekRatio) {
     shapeId = 'oval';
   }
   // Final fallback
@@ -414,11 +415,10 @@ export async function analyzeFace(
       cheekboneProminence: measurements.cheekboneProminence.toFixed(3),
       chinToJawRatio: measurements.chinToJawRatio.toFixed(3),
     });
-    console.log('Additional Ratios:', {
-      jawToForeheadRatio: (jawWidth / foreheadWidth).toFixed(3),
-      cheekboneToForeheadRatio: (cheekboneWidth / foreheadWidth).toFixed(3),
-      foreheadToFaceWidth: (foreheadWidth / cheekboneWidth).toFixed(3),
-      jawToFaceWidth: (jawWidth / cheekboneWidth).toFixed(3),
+    console.log('Classification Ratios:', {
+      foreheadToCheekRatio: (foreheadWidth / cheekboneWidth).toFixed(3),
+      jawToCheekRatio: (jawWidth / cheekboneWidth).toFixed(3),
+      lengthToWidthRatio: (faceLength / cheekboneWidth).toFixed(3),
     });
   }
 
