@@ -65,6 +65,7 @@ const FaceLandmarkOverlay = ({ photoFile, landmarks, measurements }: FaceLandmar
 
       const kp = landmarks.keypoints;
 
+      // Draw width/length measurement lines
       for (const line of LINES) {
         const p1 = kp[line.leftIdx];
         const p2 = kp[line.rightIdx];
@@ -75,7 +76,6 @@ const FaceLandmarkOverlay = ({ photoFile, landmarks, measurements }: FaceLandmar
         const x2 = p2.x * scale;
         const y2 = p2.y * scale;
 
-        // Draw line
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
@@ -83,7 +83,6 @@ const FaceLandmarkOverlay = ({ photoFile, landmarks, measurements }: FaceLandmar
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Draw endpoint dots
         for (const [px, py] of [[x1, y1], [x2, y2]]) {
           ctx.beginPath();
           ctx.arc(px, py, 4, 0, Math.PI * 2);
@@ -91,7 +90,6 @@ const FaceLandmarkOverlay = ({ photoFile, landmarks, measurements }: FaceLandmar
           ctx.fill();
         }
 
-        // Draw label
         const midX = (x1 + x2) / 2;
         const midY = (y1 + y2) / 2;
         const value = measurements[line.key];
@@ -105,6 +103,54 @@ const FaceLandmarkOverlay = ({ photoFile, landmarks, measurements }: FaceLandmar
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(text, midX, midY);
+      }
+
+      // Draw jaw angle lines (purple/magenta)
+      const jawAngleColor = "#a855f7";
+      const jawAnglePairs = [
+        { above: LANDMARKS.jawAngleAboveLeft, vertex: LANDMARKS.jawLeft, below: LANDMARKS.chin },
+        { above: LANDMARKS.jawAngleAboveRight, vertex: LANDMARKS.jawRight, below: LANDMARKS.chin },
+      ];
+
+      for (const pair of jawAnglePairs) {
+        const pA = kp[pair.above];
+        const pB = kp[pair.vertex];
+        const pC = kp[pair.below];
+        if (!pA || !pB || !pC) continue;
+
+        const ax = pA.x * scale, ay = pA.y * scale;
+        const bx = pB.x * scale, by = pB.y * scale;
+        const cx = pC.x * scale, cy = pC.y * scale;
+
+        // Draw two lines forming the angle
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.lineTo(cx, cy);
+        ctx.strokeStyle = jawAngleColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Dots on the three points
+        for (const [px, py] of [[ax, ay], [bx, by], [cx, cy]]) {
+          ctx.beginPath();
+          ctx.arc(px, py, 4, 0, Math.PI * 2);
+          ctx.fillStyle = jawAngleColor;
+          ctx.fill();
+        }
+
+        // Label with angle value
+        const angleText = `${measurements.jawAngle.toFixed(0)}°`;
+        ctx.font = "bold 11px sans-serif";
+        const tw = ctx.measureText(angleText).width;
+        const labelX = bx + (pair.vertex === LANDMARKS.jawLeft ? -tw - 10 : 10);
+        const labelY = by;
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(labelX - 4, labelY - 8, tw + 8, 16);
+        ctx.fillStyle = jawAngleColor;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(angleText, labelX + tw / 2, labelY);
       }
 
       URL.revokeObjectURL(url);
@@ -123,6 +169,10 @@ const FaceLandmarkOverlay = ({ photoFile, landmarks, measurements }: FaceLandmar
             <span className="text-muted-foreground">{l.label}</span>
           </div>
         ))}
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: "#a855f7" }} />
+          <span className="text-muted-foreground">Jaw Angle</span>
+        </div>
       </div>
     </div>
   );
