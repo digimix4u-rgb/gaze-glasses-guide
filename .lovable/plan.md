@@ -1,50 +1,76 @@
 
 
-## Fix Face Measurements: Use Actual Face Outline Landmarks
+## Fix Classification Logic for Outline Landmarks
 
 ### Problem
-The app classifies almost every face as "oval" because it measures inner facial features (inner brow points, inner cheekbone points) instead of the actual face outline. These inner measurements are all very similar in width, producing ratios near 1.0 that always fall into the oval category.
-
-### Root Cause
-Current landmark indices measure the wrong thing:
-- Forehead: points 54/284 (inner brow) -- too narrow
-- Cheekbones: points 123/352 (inner cheek) -- too narrow  
-- Jaw: points 58/288 (inner jaw) -- too narrow
-
-All three are close together in width, so the ratios don't differentiate between face shapes.
+The landmark update correctly measures the face outline, but the classification logic still uses absolute comparisons (e.g., "is forehead wider than cheekbones?"). Since cheekbones are measured ear-to-ear, they will **always** be the widest measurement on any face. This makes it impossible for the heart check to pass and causes nearly everything to fall through to oval.
 
 ### Solution
-Switch to **face contour/outline** landmarks from the MediaPipe 478-point mesh that represent the true outer boundary of the face:
+Rewrite the classification to use **relative ratios** between the three widths, with thresholds calibrated for outline measurements.
 
-- **Forehead width (temple to temple)**: Landmarks 21 and 251 -- the outer temple points at forehead level
-- **Cheekbone width (ear to ear)**: Landmarks 234 and 454 -- the widest points of the face at ear level
-- **Jaw width (jaw angle to jaw angle)**: Landmarks 172 and 397 -- the gonial angle on the face outline contour
-- **Face length**: Landmarks 10 (top of forehead) to 152 (chin) -- already correct
+The key ratios:
+- **forehead-to-cheekbone ratio** (how wide temples are relative to ears)
+- **jaw-to-cheekbone ratio** (how wide jaw angles are relative to ears)
+- **length-to-width ratio** (face length vs widest point)
 
-Additionally, display the raw measurements (in relative units) on the results page so users can see what was measured.
+Typical ranges with outline landmarks:
+- Forehead is usually 70-95% of cheekbone width
+- Jaw is usually 60-90% of cheekbone width
 
-### Changes
+### Classification Rules
 
-**File: `src/lib/faceAnalysis.ts`**
+**File: `src/lib/faceAnalysis.ts`** -- Replace `classifyFaceShape` logic (lines 175-216)
 
-1. Update the LANDMARKS object with correct face contour indices:
-   - `foreheadLeft: 21` (was 54), `foreheadRight: 251` (was 284)
-   - `cheekboneLeft: 234` (was 123), `cheekboneRight: 454` (was 352)  
-   - `jawLeft: 172` (was 58), `jawRight: 397` (was 288)
+```typescript
+const {
+  faceLength,
+  foreheadWidth,
+  cheekboneWidth,
+  jawWidth,
+} = measurements;
 
-2. No changes to the classification logic -- it already works correctly when given proper measurements.
+const lengthToWidthRatio = faceLength / cheekboneWidth;
+const foreheadToCheekRatio = foreheadWidth / cheekboneWidth;
+const jawToCheekRatio = jawWidth / cheekboneWidth;
 
-**File: `src/components/FacialFeatures.tsx`**
+let shapeId: string;
 
-3. Show the actual measured values alongside the descriptive text, so users can see the raw face outline measurements:
-   - Face Length: X units
-   - Forehead Width (temple to temple): X units
-   - Cheekbone Width (ear to ear): X units
-   - Jaw Width: X units
-   - Length-to-Width Ratio: X
+// 1. OBLONG: Face is noticeably longer than it is wide
+if (lengthToWidthRatio > 1.4) {
+  shapeId = 'oblong';
+}
+// 2. DIAMOND: Both forehead and jaw are narrow relative to cheekbones
+else if (foreheadToCheekRatio < 0.80 && jawToCheekRatio < 0.75) {
+  shapeId = 'diamond';
+}
+// 3. HEART: Forehead is relatively wide, jaw is narrow
+else if (foreheadToCheekRatio > 0.85 && jawToCheekRatio < 0.75) {
+  shapeId = 'heart';
+}
+// 4. ROUND vs SQUARE: Face length and width are similar
+else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.2) {
+  if (jawToCheekRatio >= 0.85) {
+    shapeId = 'square';
+  } else if (lengthToWidthRatio <= 1.1) {
+    shapeId = 'round';
+  } else {
+    shapeId = 'oval';
+  }
+}
+// 5. OVAL: Balanced proportions (default)
+else if (faceLength > cheekboneWidth && foreheadToCheekRatio > jawToCheekRatio) {
+  shapeId = 'oval';
+}
+// Final fallback
+else {
+  shapeId = 'oval';
+}
+```
 
-This gives transparency into what was measured and helps verify the detection is working.
+### Why This Works
+Instead of checking "is forehead wider than cheekbones?" (always false with ear-to-ear), we check "how close is the forehead to the cheekbone width?" A heart-shaped face has temples nearly as wide as the ears but a much narrower jaw. A diamond has both forehead and jaw narrow relative to ears. A square has a jaw nearly as wide as the ears.
 
-### Why This Fixes It
-With the face outline landmarks, a square face will show cheekbone width close to jaw width (both wide), while a heart face will show forehead much wider than jaw. Currently all measurements are nearly identical because they're all taken from inner facial features.
+### Debug Logging
+Add the new ratios to the console debug output so we can verify the measurements are producing correct differentiations.
 
+No changes needed to the landmarks or to `FacialFeatures.tsx`.
