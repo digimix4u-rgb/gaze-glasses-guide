@@ -1,56 +1,45 @@
 
-
-## Replace Classification Logic with User-Provided Algorithm
+## Fix Square vs Oval Misclassification
 
 ### Problem
-The current classification logic has gone through multiple iterations of fixes for heart/diamond/oblong misclassification, resulting in complex, interleaved conditions. The user has provided a cleaner, more straightforward algorithm that should be used instead.
+The square shape check only triggers when `lengthToWidthRatio` is between 0.9 and 1.1. Many square faces have a ratio slightly above 1.1 (e.g., 1.15-1.25), causing them to fall through to the oval check instead. Square faces are defined by their strong, angular jawline -- not strictly equal length and width.
 
 ### Solution
-Replace the classification logic in `classifyFaceShape` (lines 183-223) with the user's provided algorithm, adapted to the existing code structure. The new logic has no triangular shape (which we don't support), and follows a clearer priority order:
+Expand the square/round check range from `0.9-1.1` to `0.9-1.2`, and add an additional square detection path: if the jaw is very wide relative to cheekbones (`jawWidth >= cheekboneWidth * 0.9`), classify as square even when the length-to-width ratio is slightly higher.
 
-1. **Oblong** -- `lengthToWidthRatio > 1.4`
-2. **Diamond** -- Cheekbones wider than both forehead and jaw, with both forehead and jaw below 85% of cheekbone width
-3. **Heart** -- Forehead is widest (or equal to cheekbones) and wider than jaw
-4. **Round vs Square** -- `lengthToWidthRatio` between 0.9 and 1.1; square if jaw is near cheekbone width
-5. **Oval** -- Face longer than wide, forehead wider than jaw (fallback)
+### Changes
 
-### Technical Details
+**File: `src/lib/faceAnalysis.ts`** -- Update step 4 in `classifyFaceShape`
 
-**File: `src/lib/faceAnalysis.ts`** -- lines 183-223
+```text
+CURRENT (line 199-201):
+  // 4. ROUND vs SQUARE: Face length and width are similar
+  else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.1) {
+    shapeId = (jawWidth >= cheekboneWidth * 0.9) ? 'square' : 'round';
+  }
+  // 5. OVAL: Balanced proportions
+  else if (faceLength > cheekboneWidth && foreheadWidth > jawWidth) {
+    shapeId = 'oval';
+  }
 
-Remove unused variables (`isLengthSignificant`, `isRoundOrSquare`, `widths`, `largestWidth`, `chinToJawRatio` destructuring) and replace the classification block:
-
-```typescript
-const lengthToWidthRatio = faceLength / cheekboneWidth;
-
-let shapeId: string;
-
-// 1. OBLONG: Face is noticeably longer than it is wide
-if (lengthToWidthRatio > 1.4) {
-  shapeId = 'oblong';
-}
-// 2. DIAMOND: Cheekbones significantly wider than both forehead and jaw
-else if (cheekboneWidth > foreheadWidth && cheekboneWidth > jawWidth
-  && foreheadWidth < cheekboneWidth * 0.85 && jawWidth < cheekboneWidth * 0.85) {
-  shapeId = 'diamond';
-}
-// 3. HEART: Forehead is widest part and wider than jaw
-else if (foreheadWidth >= cheekboneWidth && foreheadWidth > jawWidth) {
-  shapeId = 'heart';
-}
-// 4. ROUND vs SQUARE: Face length and width are similar
-else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.1) {
-  shapeId = (jawWidth >= cheekboneWidth * 0.9) ? 'square' : 'round';
-}
-// 5. OVAL: Balanced proportions
-else if (faceLength > cheekboneWidth && foreheadWidth > jawWidth) {
-  shapeId = 'oval';
-}
-// Final fallback
-else {
-  shapeId = 'oval';
-}
+NEW:
+  // 4. ROUND vs SQUARE: Face length and width are similar
+  else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.2) {
+    if (jawWidth >= cheekboneWidth * 0.9) {
+      shapeId = 'square';
+    } else if (lengthToWidthRatio <= 1.1) {
+      shapeId = 'round';
+    } else {
+      shapeId = 'oval';
+    }
+  }
+  // 5. OVAL: Balanced proportions
+  else if (faceLength > cheekboneWidth && foreheadWidth > jawWidth) {
+    shapeId = 'oval';
+  }
 ```
 
-Also clean up the destructuring at line 175-181 to remove `chinToJawRatio` since it's no longer used in classification logic (it's still computed in measurements for display).
-
+Key changes:
+- Expand the range to 1.2 so square faces with slightly longer proportions are caught
+- Within the 1.1-1.2 range, only classify as square if jaw is wide (>= 90% of cheekbone width); otherwise fall through to oval
+- Round remains limited to the 0.9-1.1 range since round faces are truly equal in length and width
