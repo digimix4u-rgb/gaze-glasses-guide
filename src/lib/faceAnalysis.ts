@@ -190,11 +190,11 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
     shapeId = 'oblong';
   }
   // 2. DIAMOND: Both forehead and jaw are narrow relative to cheekbones
-  else if (foreheadToCheekRatio < 0.80 && jawToCheekRatio < 0.75) {
+  else if (foreheadToCheekRatio < 0.80 && jawToCheekRatio < 0.78) {
     shapeId = 'diamond';
   }
-  // 3. HEART: Forehead is relatively wide, jaw is narrow
-  else if (foreheadToCheekRatio > 0.85 && jawToCheekRatio < 0.75) {
+  // 3. HEART: Forehead is relatively wide + jaw tapers + pointed chin
+  else if (foreheadToCheekRatio > 0.82 && jawToCheekRatio < 0.82 && measurements.chinToJawRatio < 0.6) {
     shapeId = 'heart';
   }
   // 4. ROUND vs SQUARE: Face length and width are similar

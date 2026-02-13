@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import PhotoUpload from "./PhotoUpload";
 import FaceShapeCard from "./FaceShapeCard";
 import FacialFeatures from "./FacialFeatures";
+import FaceLandmarkOverlay from "./FaceLandmarkOverlay";
 import GenderSelection from "./GenderSelection";
 import { faceShapes, getFaceShapeById, FaceShape, Gender } from "@/lib/faceShapeData";
 import { FaceAnalysisResult } from "@/lib/faceAnalysis";
@@ -53,7 +54,6 @@ const AnalysisSection = () => {
   const analyzePhoto = async () => {
     if (!photoFile) return;
     
-    // Create image element from file
     const img = new Image();
     const imageUrl = URL.createObjectURL(photoFile);
     
@@ -67,15 +67,13 @@ const AnalysisSection = () => {
         if (shape) {
           setDetectedShape(shape);
           setConfidence(result.confidence);
-          // Get top 2 secondary matches
           setSecondaryMatches(result.allScores.slice(1, 3));
-          // Store measurements for facial features display
           setFaceMeasurements(result.measurements);
           setFaceLandmarks(result.landmarks);
         }
       }
       
-      URL.revokeObjectURL(imageUrl);
+      // Don't revoke URL here -- keep it alive for the overlay
     };
     
     img.src = imageUrl;
@@ -212,6 +210,18 @@ const AnalysisSection = () => {
 
               <div className="grid lg:grid-cols-2 gap-8">
                 <div className="space-y-6">
+                  {photoFile && faceLandmarks && faceMeasurements && (
+                    <div>
+                      <h4 className="text-lg font-serif font-semibold text-foreground mb-4">
+                        Landmark Measurements
+                      </h4>
+                      <FaceLandmarkOverlay
+                        photoFile={photoFile}
+                        landmarks={faceLandmarks}
+                        measurements={faceMeasurements}
+                      />
+                    </div>
+                  )}
                   <div>
                     <h4 className="text-lg font-serif font-semibold text-foreground mb-4">
                       Your Analysis
