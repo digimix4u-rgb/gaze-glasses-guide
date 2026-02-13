@@ -1,5 +1,5 @@
 import { FaceAnalysisResult } from "@/lib/faceAnalysis";
-import { Ruler, CircleDot, Square, ArrowUpDown } from "lucide-react";
+import { Ruler, CircleDot, Square, ArrowUpDown, Triangle } from "lucide-react";
 
 interface FacialFeaturesProps {
   measurements: FaceAnalysisResult['measurements'];
@@ -14,9 +14,9 @@ const FacialFeatures = ({ measurements }: FacialFeaturesProps) => {
     foreheadWidth,
     cheekboneWidth,
     jawWidth,
+    jawAngle,
   } = measurements;
 
-  // Determine descriptive terms based on measurements
   const getForeheadDescription = () => {
     if (foreheadWidth > cheekboneWidth * 1.05) return "Wide";
     if (foreheadWidth < cheekboneWidth * 0.9) return "Narrow";
@@ -54,6 +54,18 @@ const FacialFeatures = ({ measurements }: FacialFeaturesProps) => {
     return "Face width and length are nearly equal";
   };
 
+  const getJawAngleDescription = () => {
+    if (jawAngle < 130) return "Angular";
+    if (jawAngle <= 140) return "Defined";
+    return "Soft/Rounded";
+  };
+
+  const getJawAngleDetail = () => {
+    if (jawAngle < 130) return "Sharp jaw corners indicate a square or angular jawline";
+    if (jawAngle <= 140) return "Moderately defined jaw with some angularity";
+    return "Smooth, rounded jaw contour typical of oval or round faces";
+  };
+
   const features = [
     {
       icon: Ruler,
@@ -84,6 +96,12 @@ const FacialFeatures = ({ measurements }: FacialFeaturesProps) => {
         : jawWidth / foreheadWidth > 0.8 
         ? "Gently tapering toward chin" 
         : "Narrow, pointed chin area",
+    },
+    {
+      icon: Triangle,
+      label: "Jawline Angle",
+      value: `${jawAngle.toFixed(0)}° — ${getJawAngleDescription()}`,
+      detail: getJawAngleDetail(),
     },
     {
       icon: ArrowUpDown,
@@ -133,6 +151,7 @@ const FacialFeatures = ({ measurements }: FacialFeaturesProps) => {
           <span>Jaw Width: <strong className="text-foreground">{jawWidth.toFixed(0)}</strong></span>
           <span>Length:Width Ratio: <strong className="text-foreground">{lengthToWidthRatio.toFixed(2)}</strong></span>
           <span>Forehead:Jaw Ratio: <strong className="text-foreground">{foreheadToJawRatio.toFixed(2)}</strong></span>
+          <span>Jaw Angle: <strong className="text-foreground">{jawAngle.toFixed(1)}°</strong></span>
         </div>
       </div>
     </div>

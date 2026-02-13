@@ -14,6 +14,10 @@ export const LANDMARKS = {
   jawLeft: 172,
   jawRight: 397,
 
+  // Jaw angle measurement (points above jaw angle)
+  jawAngleAboveLeft: 132,
+  jawAngleAboveRight: 361,
+
   // Chin
   chin: 152,
   chinLeft: 149,
@@ -74,6 +78,7 @@ export interface FaceAnalysisResult {
     foreheadToJawRatio: number;
     cheekboneProminence: number;
     chinToJawRatio: number;
+    jawAngle: number;
   };
   landmarks: FaceLandmarks;
 }
@@ -167,6 +172,20 @@ function calculateDistance(
   );
 }
 
+function calculateAngle(
+  pointA: { x: number; y: number },
+  pointB: { x: number; y: number },  // vertex
+  pointC: { x: number; y: number }
+): number {
+  const BA = { x: pointA.x - pointB.x, y: pointA.y - pointB.y };
+  const BC = { x: pointC.x - pointB.x, y: pointC.y - pointB.y };
+  const dot = BA.x * BC.x + BA.y * BC.y;
+  const magBA = Math.sqrt(BA.x * BA.x + BA.y * BA.y);
+  const magBC = Math.sqrt(BC.x * BC.x + BC.y * BC.y);
+  const cosAngle = Math.max(-1, Math.min(1, dot / (magBA * magBC)));
+  return Math.acos(cosAngle) * (180 / Math.PI);
+}
+
 function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   shapeId: string;
   confidence: number;
@@ -177,6 +196,7 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
     foreheadWidth,
     cheekboneWidth,
     jawWidth,
+    jawAngle,
   } = measurements;
 
   const lengthToWidthRatio = faceLength / cheekboneWidth;
@@ -186,7 +206,7 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   let shapeId: string;
 
   // 1. OBLONG: Face is noticeably longer than it is wide
-  if (lengthToWidthRatio > 1.4) {
+  if (lengthToWidthRatio > 1.5) {
     shapeId = 'oblong';
   }
   // 2. DIAMOND: Both forehead and jaw are narrow relative to cheekbones
@@ -197,17 +217,15 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   else if (foreheadToCheekRatio > 0.82 && jawToCheekRatio < 0.82 && measurements.chinToJawRatio < 0.6) {
     shapeId = 'heart';
   }
-  // 4. ROUND vs SQUARE: Face length and width are similar
-  else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.2) {
-    if (jawToCheekRatio >= 0.85) {
-      shapeId = 'square';
-    } else if (lengthToWidthRatio <= 1.1) {
-      shapeId = 'round';
-    } else {
-      shapeId = 'oval';
-    }
+  // 4. SQUARE: Short-to-medium face + angular jaw + wide jaw
+  else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.2 && jawAngle < 130 && jawToCheekRatio >= 0.80) {
+    shapeId = 'square';
   }
-  // 5. OVAL: Balanced proportions (default)
+  // 5. ROUND: Short face + soft/rounded jaw
+  else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.1 && jawAngle > 140) {
+    shapeId = 'round';
+  }
+  // 6. OVAL: Balanced proportions (default)
   else if (faceLength > cheekboneWidth && foreheadToCheekRatio > jawToCheekRatio) {
     shapeId = 'oval';
   }
@@ -216,25 +234,43 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
     shapeId = 'oval';
   }
 
-  // Generate scores based on how well each shape's criteria match
+  // Distance-based scoring for each shape
   const allShapes = ['oval', 'round', 'square', 'heart', 'oblong', 'diamond'];
+  
+  const rawScores: Record<string, number> = {};
+  
+  // Oblong: higher score when lengthToWidthRatio is far above 1.5
+  rawScores['oblong'] = Math.max(0, 1 - Math.abs(lengthToWidthRatio - 1.7) / 0.5);
+  
+  // Diamond: narrow forehead + narrow jaw relative to cheekbones
+  rawScores['diamond'] = Math.max(0, (1 - foreheadToCheekRatio) + (1 - jawToCheekRatio)) / 2;
+  
+  // Heart: wide forehead + narrow jaw + pointed chin
+  rawScores['heart'] = Math.max(0, (foreheadToCheekRatio - 0.7) + (1 - jawToCheekRatio) + (1 - measurements.chinToJawRatio)) / 3;
+  
+  // Square: near-equal ratio + angular jaw + wide jaw
+  rawScores['square'] = Math.max(0, (1 - Math.abs(lengthToWidthRatio - 1.05) / 0.3) + (jawAngle < 130 ? 1 : Math.max(0, 1 - (jawAngle - 130) / 20)) + (jawToCheekRatio > 0.8 ? 1 : 0)) / 3;
+  
+  // Round: near-equal ratio + soft jaw
+  rawScores['round'] = Math.max(0, (1 - Math.abs(lengthToWidthRatio - 1.0) / 0.2) + (jawAngle > 140 ? 1 : Math.max(0, 1 - (140 - jawAngle) / 20))) / 2;
+  
+  // Oval: balanced proportions + moderate jaw angle
+  rawScores['oval'] = Math.max(0, (1 - Math.abs(lengthToWidthRatio - 1.35) / 0.3) + (1 - Math.abs(jawAngle - 142) / 30)) / 2;
+  
+  // Boost the winner
+  rawScores[shapeId] = Math.max(rawScores[shapeId], 0.5);
+
+  const total = Object.values(rawScores).reduce((sum, v) => sum + v, 0);
   const scores = allShapes.map(id => ({
     shapeId: id,
-    score: id === shapeId ? 40 : Math.floor(Math.random() * 15 + 5),
+    score: Math.round((rawScores[id] / total) * 100),
   }));
-
-  // Normalize to 100%
-  const total = scores.reduce((sum, s) => sum + s.score, 0);
-  const normalizedScores = scores.map(s => ({
-    shapeId: s.shapeId,
-    score: Math.round((s.score / total) * 100),
-  }));
-  normalizedScores.sort((a, b) => b.score - a.score);
+  scores.sort((a, b) => b.score - a.score);
 
   return {
     shapeId,
-    confidence: normalizedScores[0].score,
-    allScores: normalizedScores,
+    confidence: scores[0].score,
+    allScores: scores,
   };
 }
 
@@ -385,6 +421,13 @@ export async function analyzeFace(
   const faceWidth = Math.max(foreheadWidth, cheekboneWidth, jawWidth);
   const chinToJawRatio = chinWidth / jawWidth;
 
+  // Calculate jaw angles
+  const jawAngleAboveLeft = getPoint(LANDMARKS.jawAngleAboveLeft);
+  const jawAngleAboveRight = getPoint(LANDMARKS.jawAngleAboveRight);
+  const leftJawAngle = calculateAngle(jawAngleAboveLeft, jawLeft, chin);
+  const rightJawAngle = calculateAngle(jawAngleAboveRight, jawRight, chin);
+  const jawAngle = (leftJawAngle + rightJawAngle) / 2;
+
   const measurements = {
     faceLength,
     faceWidth,
@@ -396,6 +439,7 @@ export async function analyzeFace(
     foreheadToJawRatio: foreheadWidth / jawWidth,
     cheekboneProminence: cheekboneWidth / ((foreheadWidth + jawWidth) / 2),
     chinToJawRatio,
+    jawAngle,
   };
 
   // Debug logging in development
@@ -408,6 +452,7 @@ export async function analyzeFace(
       chinWidth: chinWidth.toFixed(1),
       faceLength: faceLength.toFixed(1),
       faceWidth: faceWidth.toFixed(1),
+      jawAngle: jawAngle.toFixed(1),
     });
     console.log('Key Ratios:', {
       lengthToWidthRatio: measurements.lengthToWidthRatio.toFixed(3),
@@ -419,6 +464,7 @@ export async function analyzeFace(
       foreheadToCheekRatio: (foreheadWidth / cheekboneWidth).toFixed(3),
       jawToCheekRatio: (jawWidth / cheekboneWidth).toFixed(3),
       lengthToWidthRatio: (faceLength / cheekboneWidth).toFixed(3),
+      jawAngle: jawAngle.toFixed(1),
     });
   }
 
