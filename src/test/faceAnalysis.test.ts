@@ -41,7 +41,7 @@ describe("Diamond Face Shape Detection", () => {
       chinWidth: 100,
       lengthToWidthRatio: 1.35, // 200/150
       foreheadToJawRatio: 1.0,
-      cheekboneProminence: 1.10, // Updated target: 150 / ((127.5 + 127.5) / 2) = 1.176
+      cheekboneProminence: 1.10, // Actual measurement value, testing against new target of 1.10
       chinToJawRatio: 0.78,
     };
 
