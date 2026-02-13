@@ -2,22 +2,22 @@ import { FilesetResolver, FaceLandmarker } from '@mediapipe/tasks-vision';
 
 // MediaPipe 478-point face mesh landmark indices
 export const LANDMARKS = {
-  // Forehead
-  foreheadLeft: 70,
-  foreheadRight: 300,
+  // Forehead (outer brow/temple width)
+  foreheadLeft: 103,
+  foreheadRight: 332,
 
-  // Cheekbones
-  cheekboneLeft: 234,
-  cheekboneRight: 454,
+  // Cheekbones (zygomatic prominence)
+  cheekboneLeft: 123,
+  cheekboneRight: 352,
 
-  // Jaw
-  jawLeft: 172,
-  jawRight: 397,
+  // Jaw (gonial angle)
+  jawLeft: 58,
+  jawRight: 288,
 
   // Chin
   chin: 152,
-  chinLeft: 175,
-  chinRight: 396,
+  chinLeft: 149,
+  chinRight: 378,
 
   // Nose
   noseBridge: 6,
@@ -446,6 +446,21 @@ export async function analyzeFace(
     cheekboneProminence: cheekboneWidth / ((foreheadWidth + jawWidth) / 2),
     chinToJawRatio,
   };
+
+  // Debug logging in development
+  if (import.meta.env.DEV) {
+    console.log('[FaceAnalysis] Measurements:', {
+      foreheadWidth: foreheadWidth.toFixed(1),
+      cheekboneWidth: cheekboneWidth.toFixed(1),
+      jawWidth: jawWidth.toFixed(1),
+      chinWidth: chinWidth.toFixed(1),
+      faceLength: faceLength.toFixed(1),
+      lengthToWidthRatio: measurements.lengthToWidthRatio.toFixed(3),
+      foreheadToJawRatio: measurements.foreheadToJawRatio.toFixed(3),
+      cheekboneProminence: measurements.cheekboneProminence.toFixed(3),
+      chinToJawRatio: measurements.chinToJawRatio.toFixed(3),
+    });
+  }
 
   const faceLandmarks = extractFaceLandmarks(landmarks, imageWidth, imageHeight);
   const classification = classifyFaceShape(measurements);
