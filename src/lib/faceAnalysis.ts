@@ -177,6 +177,7 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
     foreheadWidth,
     cheekboneWidth,
     jawWidth,
+    chinToJawRatio,
   } = measurements;
 
   // Rule-based classification from provided algorithm
@@ -194,13 +195,22 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
   let shapeId: string;
 
   // Heart checks BEFORE oblong — heart faces are naturally elongated
-  if (foreheadWidth > jawWidth * 1.15 && (largestWidth === 'forehead' || foreheadWidth >= cheekboneWidth * 0.92)) {
+  if (foreheadWidth > jawWidth * 1.10 && (largestWidth === 'forehead' || foreheadWidth >= cheekboneWidth * 0.92)) {
+    shapeId = 'heart';
+  } else if (foreheadWidth > jawWidth * 1.05 && chinToJawRatio < 0.7) {
+    // Pointed chin with moderately wider forehead = heart
     shapeId = 'heart';
   } else if (faceLength > cheekboneWidth * 1.3 && foreheadWidth / jawWidth < 1.1) {
     // Oblong: elongated AND forehead/jaw are similar width (not heart-like)
     shapeId = 'oblong';
   } else if (largestWidth === 'cheekbones' && cheekboneWidth > foreheadWidth && cheekboneWidth > jawWidth) {
-    shapeId = (faceLength > cheekboneWidth) ? 'diamond' : 'round';
+    // Only diamond if forehead is genuinely narrow relative to cheekbones
+    if (foreheadWidth < cheekboneWidth * 0.88) {
+      shapeId = (faceLength > cheekboneWidth) ? 'diamond' : 'round';
+    } else {
+      // Forehead is close to cheekbone width -- likely oval or heart, not diamond
+      shapeId = (faceLength > cheekboneWidth) ? 'oval' : 'round';
+    }
   } else if (isRoundOrSquare) {
     shapeId = (jawWidth > cheekboneWidth * 0.9) ? 'square' : 'round';
   } else if (faceLength > cheekboneWidth && foreheadWidth > jawWidth) {
