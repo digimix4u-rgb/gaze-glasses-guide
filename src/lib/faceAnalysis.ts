@@ -177,49 +177,36 @@ function classifyFaceShape(measurements: FaceAnalysisResult['measurements']): {
     foreheadWidth,
     cheekboneWidth,
     jawWidth,
-    chinToJawRatio,
   } = measurements;
 
-  // Rule-based classification from provided algorithm
   const lengthToWidthRatio = faceLength / cheekboneWidth;
-  const isLengthSignificant = faceLength > cheekboneWidth * 1.25;
-  const isRoundOrSquare = Math.abs(lengthToWidthRatio - 1.0) < 0.15;
-
-  const widths: Record<string, number> = {
-    forehead: foreheadWidth,
-    cheekbones: cheekboneWidth,
-    jawline: jawWidth,
-  };
-  const largestWidth = Object.keys(widths).reduce((a, b) => widths[a] > widths[b] ? a : b);
 
   let shapeId: string;
 
-  // Heart checks BEFORE oblong — heart faces are naturally elongated
-  if (foreheadWidth > jawWidth * 1.10 && (largestWidth === 'forehead' || foreheadWidth >= cheekboneWidth * 0.92)) {
-    shapeId = 'heart';
-  } else if (foreheadWidth > jawWidth * 1.05 && chinToJawRatio < 0.7) {
-    // Pointed chin with moderately wider forehead = heart
-    shapeId = 'heart';
-  } else if (faceLength > cheekboneWidth * 1.3 && foreheadWidth / jawWidth < 1.1) {
-    // Oblong: elongated AND forehead/jaw are similar width (not heart-like)
+  // 1. OBLONG: Face is noticeably longer than it is wide
+  if (lengthToWidthRatio > 1.4) {
     shapeId = 'oblong';
-  } else if (largestWidth === 'cheekbones' && cheekboneWidth > foreheadWidth && cheekboneWidth > jawWidth) {
-    // Only diamond if forehead is genuinely narrow relative to cheekbones
-    if (foreheadWidth < cheekboneWidth * 0.88) {
-      shapeId = (faceLength > cheekboneWidth) ? 'diamond' : 'round';
-    } else {
-      // Forehead is close to cheekbone width -- likely oval or heart, not diamond
-      shapeId = (faceLength > cheekboneWidth) ? 'oval' : 'round';
-    }
-  } else if (isRoundOrSquare) {
-    shapeId = (jawWidth > cheekboneWidth * 0.9) ? 'square' : 'round';
-  } else if (faceLength > cheekboneWidth && foreheadWidth > jawWidth) {
+  }
+  // 2. DIAMOND: Cheekbones significantly wider than both forehead and jaw
+  else if (cheekboneWidth > foreheadWidth && cheekboneWidth > jawWidth
+    && foreheadWidth < cheekboneWidth * 0.85 && jawWidth < cheekboneWidth * 0.85) {
+    shapeId = 'diamond';
+  }
+  // 3. HEART: Forehead is widest part and wider than jaw
+  else if (foreheadWidth >= cheekboneWidth && foreheadWidth > jawWidth) {
+    shapeId = 'heart';
+  }
+  // 4. ROUND vs SQUARE: Face length and width are similar
+  else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.1) {
+    shapeId = (jawWidth >= cheekboneWidth * 0.9) ? 'square' : 'round';
+  }
+  // 5. OVAL: Balanced proportions
+  else if (faceLength > cheekboneWidth && foreheadWidth > jawWidth) {
     shapeId = 'oval';
-  } else if (largestWidth === 'jawline') {
-    // No triangle shape in our system, map to square as closest match
-    shapeId = 'square';
-  } else {
-    shapeId = 'oval'; // Default fallback
+  }
+  // Final fallback
+  else {
+    shapeId = 'oval';
   }
 
   // Generate scores based on how well each shape's criteria match
