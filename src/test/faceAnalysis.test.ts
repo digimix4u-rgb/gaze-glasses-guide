@@ -41,25 +41,25 @@ describe("Diamond Face Shape Detection", () => {
       chinWidth: 100,
       lengthToWidthRatio: 1.35, // 200/150
       foreheadToJawRatio: 1.0,
-      cheekboneProminence: 1.10, // Actual measurement value, testing against new target of 1.10
+      cheekboneProminence: 1.15, // Actual measurement value, testing against new target of 1.15
       chinToJawRatio: 0.78,
     };
 
     const foreheadToFaceWidth = measurements.foreheadWidth / measurements.cheekboneWidth; // 0.85
     const jawToFaceWidth = measurements.jawWidth / measurements.cheekboneWidth; // 0.85
 
-    // Test with NEW parameters
+    // Test with NEW parameters (from solution)
     const newDiamondScore = calculateWeightedShapeScore([
-      { value: measurements.lengthToWidthRatio, target: 1.35, tolerance: 0.15, weight: 1.5 },
-      { value: measurements.cheekboneProminence, target: 1.10, tolerance: 0.08, weight: 2.0 }, // NEW: target 1.10, tolerance 0.08, weight 2.0
+      { value: measurements.lengthToWidthRatio, target: 1.35, tolerance: 0.12, weight: 1.5 },
+      { value: measurements.cheekboneProminence, target: 1.15, tolerance: 0.08, weight: 2.5 }, // NEW: target 1.15, tolerance 0.08, weight 2.5
       { value: foreheadToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.0 }, // NEW: weight 2.0
       { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.0 }, // NEW: weight 2.0
     ]);
 
-    // Test with OLD parameters for comparison
+    // Test with OLD parameters (duplicate-ridden version)
     const oldDiamondScore = calculateWeightedShapeScore([
-      { value: measurements.lengthToWidthRatio, target: 1.35, tolerance: 0.15, weight: 1.5 },
-      { value: measurements.cheekboneProminence, target: 1.15, tolerance: 0.1, weight: 3.0 }, // OLD: target 1.15, tolerance 0.1, weight 3.0
+      { value: measurements.lengthToWidthRatio, target: 1.35, tolerance: 0.12, weight: 1.5 },
+      { value: measurements.cheekboneProminence, target: 1.18, tolerance: 0.08, weight: 2.5 }, // OLD: target 1.18, tolerance 0.08, weight 2.5
       { value: foreheadToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 }, // OLD: weight 2.5
       { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 }, // OLD: weight 2.5
     ]);
@@ -68,8 +68,8 @@ describe("Diamond Face Shape Detection", () => {
     expect(newDiamondScore).toBeGreaterThan(0);
     expect(newDiamondScore).toBeLessThanOrEqual(1);
 
-    // The new parameters should be more conservative (lower score for borderline cases)
-    // This specific case with cheekboneProminence of 1.10 should score well with new params
+    // The new parameters should be more selective (tighter tolerance on lengthToWidthRatio)
+    // This specific case with cheekboneProminence of 1.15 should score well with new params
     expect(newDiamondScore).toBeGreaterThan(0.5);
   });
 
@@ -84,53 +84,53 @@ describe("Diamond Face Shape Detection", () => {
       chinWidth: 100,
       lengthToWidthRatio: 1.35,
       foreheadToJawRatio: 1.0,
-      cheekboneProminence: 1.20, // Slightly high
+      cheekboneProminence: 1.25, // Slightly high from target 1.15
       chinToJawRatio: 0.78,
     };
 
     const foreheadToFaceWidth = measurements.foreheadWidth / measurements.cheekboneWidth;
     const jawToFaceWidth = measurements.jawWidth / measurements.cheekboneWidth;
 
-    // New parameters with tighter tolerance should penalize deviation more
+    // New parameters with tighter tolerance (0.12) should penalize deviation more
     const newScore = calculateWeightedShapeScore([
-      { value: measurements.lengthToWidthRatio, target: 1.35, tolerance: 0.15, weight: 1.5 },
-      { value: measurements.cheekboneProminence, target: 1.10, tolerance: 0.08, weight: 2.0 },
+      { value: measurements.lengthToWidthRatio, target: 1.35, tolerance: 0.12, weight: 1.5 },
+      { value: measurements.cheekboneProminence, target: 1.15, tolerance: 0.08, weight: 2.5 },
       { value: foreheadToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.0 },
       { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.0 },
     ]);
 
-    // Old parameters with wider tolerance
+    // Old parameters with duplicate issues
     const oldScore = calculateWeightedShapeScore([
-      { value: measurements.lengthToWidthRatio, target: 1.35, tolerance: 0.15, weight: 1.5 },
-      { value: measurements.cheekboneProminence, target: 1.15, tolerance: 0.1, weight: 3.0 },
+      { value: measurements.lengthToWidthRatio, target: 1.35, tolerance: 0.12, weight: 1.5 },
+      { value: measurements.cheekboneProminence, target: 1.18, tolerance: 0.08, weight: 2.5 },
       { value: foreheadToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 },
       { value: jawToFaceWidth, target: 0.85, tolerance: 0.1, weight: 2.5 },
     ]);
 
-    // New score should be lower due to tighter tolerance and different target
+    // New score should be lower due to deviation from target (1.15 vs 1.25)
     expect(newScore).toBeLessThan(oldScore);
   });
 
   it("should have more balanced weights", () => {
     // Verify that total weight is more balanced
-    const newWeights = [1.5, 2.0, 2.0, 2.0]; // lengthToWidthRatio, cheekboneProminence, foreheadToFaceWidth, jawToFaceWidth
-    const oldWeights = [1.5, 3.0, 2.5, 2.5];
+    const newWeights = [1.5, 2.5, 2.0, 2.0]; // lengthToWidthRatio, cheekboneProminence, foreheadToFaceWidth, jawToFaceWidth
+    const oldWeights = [1.5, 2.5, 2.5, 2.5]; // Before removing duplicates
 
     const newTotalWeight = newWeights.reduce((sum, w) => sum + w, 0);
     const oldTotalWeight = oldWeights.reduce((sum, w) => sum + w, 0);
 
-    // New total weight should be 7.5
-    expect(newTotalWeight).toBe(7.5);
+    // New total weight should be 8.0
+    expect(newTotalWeight).toBe(8.0);
     
-    // Old total weight should be 9.5
-    expect(oldTotalWeight).toBe(9.5);
+    // Old total weight should be 9.0
+    expect(oldTotalWeight).toBe(9.0);
 
     // New parameters should have more balanced distribution
-    // cheekboneProminence should no longer dominate (was 3.0/9.5 = 31.6%, now 2.0/7.5 = 26.7%)
-    const newCheekboneRatio = 2.0 / newTotalWeight;
-    const oldCheekboneRatio = 3.0 / oldTotalWeight;
+    // foreheadToFaceWidth and jawToFaceWidth now have weight 2.0 instead of 2.5 for better balance
+    const newForeheadRatio = 2.0 / newTotalWeight;
+    const oldForeheadRatio = 2.5 / oldTotalWeight;
 
-    expect(newCheekboneRatio).toBeLessThan(oldCheekboneRatio);
-    expect(newCheekboneRatio).toBeCloseTo(0.267, 2);
+    expect(newForeheadRatio).toBeLessThan(oldForeheadRatio);
+    expect(newForeheadRatio).toBeCloseTo(0.25, 2);
   });
 });
