@@ -29,8 +29,8 @@ const CameraCapture = ({ onCapture, onClose }: CameraCaptureProps) => {
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: facing,
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
         },
         audio: false
       });
@@ -180,7 +180,7 @@ const CameraCapture = ({ onCapture, onClose }: CameraCaptureProps) => {
         {/* Face guide overlay */}
         {!capturedImage && !error && !isLoading && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-64 h-80 border-2 border-dashed border-background/50 rounded-[40%] flex items-end justify-center pb-4">
+            <div className="w-[75vw] max-w-sm h-[55vh] max-h-[500px] border-2 border-dashed border-background/50 rounded-[40%] flex items-end justify-center pb-4">
               <span className="text-background/70 text-sm">Position face here</span>
             </div>
           </div>
