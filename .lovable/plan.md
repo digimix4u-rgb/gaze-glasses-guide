@@ -1,76 +1,65 @@
 
 
-## Fix Classification Logic for Outline Landmarks
+## Add Landmark Visualization + Fix Heart Classification
 
-### Problem
-The landmark update correctly measures the face outline, but the classification logic still uses absolute comparisons (e.g., "is forehead wider than cheekbones?"). Since cheekbones are measured ear-to-ear, they will **always** be the widest measurement on any face. This makes it impossible for the heart check to pass and causes nearly everything to fall through to oval.
+### Overview
+Two changes: (1) Create a visual overlay component that draws the measurement lines directly on the uploaded photo so you can see exactly what the AI is measuring, and (2) investigate and fix why hearts are still classified as oval.
 
-### Solution
-Rewrite the classification to use **relative ratios** between the three widths, with thresholds calibrated for outline measurements.
+### 1. New Component: `FaceLandmarkOverlay`
 
-The key ratios:
-- **forehead-to-cheekbone ratio** (how wide temples are relative to ears)
-- **jaw-to-cheekbone ratio** (how wide jaw angles are relative to ears)
-- **length-to-width ratio** (face length vs widest point)
+Create `src/components/FaceLandmarkOverlay.tsx` -- a canvas-based component that draws on top of the uploaded photo:
 
-Typical ranges with outline landmarks:
-- Forehead is usually 70-95% of cheekbone width
-- Jaw is usually 60-90% of cheekbone width
+- Takes the photo file, landmarks, and measurements as props
+- Draws the image on a canvas, then overlays colored measurement lines:
+  - **Green line**: Forehead width (temple to temple, landmarks 21-251)
+  - **Blue line**: Cheekbone width (ear to ear, landmarks 234-454)
+  - **Red line**: Jaw width (jaw angle to jaw angle, landmarks 172-397)
+  - **Yellow line**: Face length (top of head to chin, landmarks 10-152)
+- Labels each line with its pixel value
+- Dots on each landmark point used for measurement
 
-### Classification Rules
+This gives full transparency into what the AI is detecting.
 
-**File: `src/lib/faceAnalysis.ts`** -- Replace `classifyFaceShape` logic (lines 175-216)
+### 2. Display in Results
 
-```typescript
-const {
-  faceLength,
-  foreheadWidth,
-  cheekboneWidth,
-  jawWidth,
-} = measurements;
+Update `src/components/AnalysisSection.tsx` to show the landmark overlay in the results view:
 
-const lengthToWidthRatio = faceLength / cheekboneWidth;
-const foreheadToCheekRatio = foreheadWidth / cheekboneWidth;
-const jawToCheekRatio = jawWidth / cheekboneWidth;
+- Store the photo URL so it persists to the results screen
+- Add the `FaceLandmarkOverlay` component in the left column of the results grid, above or alongside the face shape card
+- Shows the photo with measurement lines drawn on it
 
-let shapeId: string;
+### 3. Fix Heart Classification Threshold
 
-// 1. OBLONG: Face is noticeably longer than it is wide
-if (lengthToWidthRatio > 1.4) {
-  shapeId = 'oblong';
-}
-// 2. DIAMOND: Both forehead and jaw are narrow relative to cheekbones
-else if (foreheadToCheekRatio < 0.80 && jawToCheekRatio < 0.75) {
-  shapeId = 'diamond';
-}
-// 3. HEART: Forehead is relatively wide, jaw is narrow
-else if (foreheadToCheekRatio > 0.85 && jawToCheekRatio < 0.75) {
+The current heart rule requires `jawToCheekRatio < 0.75`, which is very strict. With ear-to-ear cheekbone measurements, the jaw-to-cheek ratio for heart faces is often around 0.75-0.82 (the jaw is narrower but not drastically so). 
+
+Update in `src/lib/faceAnalysis.ts`:
+- Relax the jaw threshold for heart from `< 0.75` to `< 0.82`
+- Add a chin-to-jaw ratio check: heart faces have a pointed chin (`chinToJawRatio < 0.6`)
+- Adjust diamond threshold similarly to `< 0.78` to keep it distinct from heart
+
+Updated heart rule:
+```
+// HEART: Forehead relatively wide + jaw tapers + pointed chin
+else if (foreheadToCheekRatio > 0.82 && jawToCheekRatio < 0.82 && chinToJawRatio < 0.6) {
   shapeId = 'heart';
-}
-// 4. ROUND vs SQUARE: Face length and width are similar
-else if (lengthToWidthRatio >= 0.9 && lengthToWidthRatio <= 1.2) {
-  if (jawToCheekRatio >= 0.85) {
-    shapeId = 'square';
-  } else if (lengthToWidthRatio <= 1.1) {
-    shapeId = 'round';
-  } else {
-    shapeId = 'oval';
-  }
-}
-// 5. OVAL: Balanced proportions (default)
-else if (faceLength > cheekboneWidth && foreheadToCheekRatio > jawToCheekRatio) {
-  shapeId = 'oval';
-}
-// Final fallback
-else {
-  shapeId = 'oval';
 }
 ```
 
-### Why This Works
-Instead of checking "is forehead wider than cheekbones?" (always false with ear-to-ear), we check "how close is the forehead to the cheekbone width?" A heart-shaped face has temples nearly as wide as the ears but a much narrower jaw. A diamond has both forehead and jaw narrow relative to ears. A square has a jaw nearly as wide as the ears.
+### Technical Details
 
-### Debug Logging
-Add the new ratios to the console debug output so we can verify the measurements are producing correct differentiations.
+**New file: `src/components/FaceLandmarkOverlay.tsx`**
+- Uses HTML Canvas API to draw the image and overlay lines
+- Scales canvas to fit container while maintaining aspect ratio
+- Draws 4 colored measurement lines with endpoint dots and text labels
+- Props: `photoFile: File`, `landmarks: FaceLandmarks`, `measurements: FaceAnalysisResult['measurements']`
 
-No changes needed to the landmarks or to `FacialFeatures.tsx`.
+**Modified: `src/components/AnalysisSection.tsx`**
+- Keep `photoFile` URL available in results view (don't revoke URL until reset)
+- Import and render `FaceLandmarkOverlay` in the results grid
+
+**Modified: `src/lib/faceAnalysis.ts`**
+- Pass `chinToJawRatio` into classification function
+- Relax heart jaw threshold from 0.75 to 0.82
+- Add chin pointedness check for heart detection
+- Adjust diamond to use `< 0.78` for jaw ratio
+
